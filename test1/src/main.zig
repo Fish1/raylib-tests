@@ -13,10 +13,11 @@ var camera = rl.Camera2D{
         .y = 0,
     },
     .rotation = 0,
-    .zoom = 1,
+    .zoom = 0.5,
 };
 
 var map = Map.init();
+var lives: u32 = 3;
 
 pub fn main() void {
     const width = 800;
@@ -38,14 +39,16 @@ pub fn main() void {
 fn setup() void {
     map.add_tower(.init(.green), 0, 0);
     map.add_tower(.init(.blue), 1, 1);
-
     map.add_enemy(.init(.red), 3, 3);
 }
 
 fn process(delta: f32) void {
     control_camera(delta);
+    map.process(camera);
+
     if (rl.isKeyReleased(.space)) {
         map.next_turn();
+        lives = lives + 1;
     }
 }
 
@@ -82,4 +85,11 @@ fn draw() void {
 
     rl.endMode2D();
     rl.drawText("Press space for next turn...", 5, 5, 24, .white);
+    draw_lives();
+}
+
+fn draw_lives() void {
+    var buffer: [24]u8 = undefined;
+    const result = std.fmt.bufPrintZ(&buffer, "Lives: {d}", .{lives}) catch unreachable;
+    rl.drawText(result, 5, 48, 24, .white);
 }

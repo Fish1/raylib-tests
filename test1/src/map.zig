@@ -9,6 +9,7 @@ pub fn Map(width: usize) type {
         size: usize = width * width,
         towers: [width * width]?Tower,
         enemies: [width * width]?Enemy,
+        build_position: rl.Vector2 = rl.Vector2{ .x = 0, .y = 0 },
 
         pub fn init() @This() {
             return @This(){
@@ -25,6 +26,16 @@ pub fn Map(width: usize) type {
         pub fn add_enemy(self: *@This(), enemy: Enemy, x: usize, y: usize) void {
             const index = (y * width) + x;
             self.enemies[index] = enemy;
+        }
+
+        pub fn process(self: *@This(), camera: rl.Camera2D) void {
+            self.put_build_template(camera);
+        }
+
+        pub fn put_build_template(self: *@This(), camera: rl.Camera2D) void {
+            const world_position = rl.getScreenToWorld2D(rl.getMousePosition(), camera);
+            self.build_position = world_position;
+            std.debug.print("pos = {any}\n", .{self.build_position});
         }
 
         pub fn next_turn(self: *@This()) void {
@@ -67,6 +78,16 @@ pub fn Map(width: usize) type {
                     rl.drawRectangle(px, py, 64, 64, enemy.color);
                 }
             }
+
+            const build_tile_x: i32 = @intFromFloat(@floor(self.build_position.x / 64.0));
+            const build_world_x: i32 = build_tile_x * 64;
+            const build_tile_y: i32 = @intFromFloat(@floor(self.build_position.y / 64.0));
+            const build_world_y: i32 = build_tile_y * 64;
+
+            rl.drawRectangle(build_world_x, build_world_y, 12, 12, .white);
+            rl.drawRectangle(build_world_x + 64 - 12, build_world_y, 12, 12, .white);
+            rl.drawRectangle(build_world_x, build_world_y + 64 - 12, 12, 12, .white);
+            rl.drawRectangle(build_world_x + 64 - 12, build_world_y + 64 - 12, 12, 12, .white);
         }
     };
 }
