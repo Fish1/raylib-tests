@@ -65,22 +65,22 @@ pub const Player = struct {
     fn player_control_state(self: *@This(), map: Map, delta: f32) void {
         self.e = self.e + delta * 1.5;
         self.animation = .EaseOutElastic;
-        if (rl.isKeyPressed(.right)) {
+        if (rl.isKeyPressed(.right) and self.x <= 16) {
             self.py = self.y;
             self.px = self.x;
             self.x = self.x + 1;
             self.e = 0;
-        } else if (rl.isKeyPressed(.left)) {
+        } else if (rl.isKeyPressed(.left) and self.x > 14) {
             self.py = self.y;
             self.px = self.x;
             self.x = self.x - 1;
             self.e = 0;
-        } else if (rl.isKeyPressed(.up)) {
+        } else if (rl.isKeyPressed(.up) and self.y > 14) {
             self.py = self.y;
             self.px = self.x;
             self.y = self.y - 1;
             self.e = 0;
-        } else if (rl.isKeyPressed(.down)) {
+        } else if (rl.isKeyPressed(.down) and self.y <= 16) {
             self.py = self.y;
             self.px = self.x;
             self.y = self.y + 1;

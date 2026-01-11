@@ -7,7 +7,7 @@ const Map = @import("map.zig").Map;
 
 const tile_size = 64;
 
-var map: Map = .init();
+var map: Map = Map.init() catch unreachable;
 var player: Player = .init();
 
 var camera: rl.Camera2D = .{
