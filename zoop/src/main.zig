@@ -2,7 +2,6 @@ const std = @import("std");
 const rl = @import("raylib");
 const ease = @import("ease.zig");
 const Player = @import("player.zig").Player;
-const Enemy = @import("enemy.zig").Enemy;
 const Map = @import("map.zig").Map;
 
 const tile_size = 64;
@@ -40,7 +39,7 @@ pub fn main() void {
 }
 
 fn process(delta: f32) void {
-    player.process(map, delta);
+    player.process(&map, delta);
 }
 
 fn draw() void {
@@ -58,7 +57,7 @@ fn draw() void {
 fn draw_player() void {
     const rx = ease.ease(player.animation, @floatFromInt(player.px), @floatFromInt(player.x), player.e) * tile_size;
     const ry = ease.ease(player.animation, @floatFromInt(player.py), @floatFromInt(player.y), player.e) * tile_size;
-    rl.drawCircle(@intFromFloat(rx + 32), @intFromFloat(ry + 32), 32, .green);
+    rl.drawCircle(@intFromFloat(rx + 32), @intFromFloat(ry + 32), 32, player.color);
 }
 
 fn draw_player_map() void {
