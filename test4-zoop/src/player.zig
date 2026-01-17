@@ -26,7 +26,17 @@ pub const Player = struct {
     animation: Animation,
     action: Action,
 
-    pub fn init() @This() {
+    score: u64,
+    player_texture: rl.Texture,
+    attack_texture: rl.Texture,
+
+    pub fn init() !@This() {
+        var player_texture = try rl.loadTexture("./assets/player.png");
+        player_texture.width = 64;
+        player_texture.height = 64;
+        var attack_texture = try rl.loadTexture("./assets/attack.png");
+        attack_texture.width = 64;
+        attack_texture.height = 64;
         return .{
             .x = 16,
             .y = 16,
@@ -38,7 +48,14 @@ pub const Player = struct {
             .state = .player_control,
             .animation = .EaseInBack,
             .action = .score,
+            .score = 0,
+            .player_texture = player_texture,
+            .attack_texture = attack_texture,
         };
+    }
+
+    pub fn deinit(self: *@This()) void {
+        rl.unloadTexture(self.player_texture);
     }
 
     pub fn process(self: *@This(), map: *Map, delta: f32) void {
@@ -54,6 +71,10 @@ pub const Player = struct {
         const rx = ease.ease(self.animation, @floatFromInt(self.px), @floatFromInt(self.x), self.e) * 64;
         const ry = ease.ease(self.animation, @floatFromInt(self.py), @floatFromInt(self.y), self.e) * 64;
         rl.drawCircle(@intFromFloat(rx + 32), @intFromFloat(ry + 32), 32, self.color);
+        rl.drawTexture(self.player_texture, @intFromFloat(rx), @intFromFloat(ry), self.color);
+        if (self.state == .attack_init or self.state == .attack_back) {
+            rl.drawTexture(self.attack_texture, @intFromFloat(rx), @intFromFloat(ry), self.color);
+        }
     }
 
     fn attack_init_state(self: *@This(), delta: f32) void {
@@ -85,8 +106,8 @@ pub const Player = struct {
                 self.color = enemy_color;
                 self.identifier = enemy_identifier;
             } else if (self.action == .score) {
-                std.debug.print("SCORE!\n", .{});
-                map.remove_enemies_between(self.x, self.y, self.px, self.py);
+                const score: u64 = @intCast(map.remove_enemies_between(self.x, self.y, self.px, self.py));
+                self.score = self.score + std.math.pow(u64, 3, score);
             }
         }
         self.state = .attack_back;

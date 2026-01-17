@@ -22,15 +22,16 @@ var camera: rl.Camera2D = .{
 pub fn main() !void {
     std.debug.print("Zoop!\n", .{});
 
-    var map: Map = try Map.init();
-    var player: Player = .init();
-
     const width = 1024;
     const height = 1024;
 
     rl.initWindow(width, height, "Zoop!");
     defer rl.closeWindow();
     rl.setTargetFPS(60);
+
+    var map: Map = try Map.init();
+    var player: Player = try Player.init();
+    defer player.deinit();
 
     while (rl.windowShouldClose() == false) {
         const delta = rl.getFrameTime();
@@ -40,7 +41,7 @@ pub fn main() !void {
 }
 
 fn process(player: *Player, map: *Map, delta: f32) void {
-    map.process(delta);
+    map.process(player, delta);
     player.process(map, delta);
 }
 
@@ -54,15 +55,25 @@ fn draw(player: *Player, map: *Map) void {
     player.draw();
     map.draw();
     rl.endMode2D();
+
+    var buffer: [32]u8 = undefined;
+    const result = std.fmt.bufPrintZ(&buffer, "score: {d}", .{player.score}) catch unreachable;
+    rl.drawText(result, 15, 15, 24, .white);
 }
 
 fn draw_player_map() void {
-    const width = 4;
-    const height = 4;
+    const width = 32;
+    const height = 32;
     for (0..width * height) |index| {
-        const x: i32 = @intCast(@mod(index, width) * tile_size + (tile_size * 14));
-        const y: i32 = @intCast(@divFloor(index, height) * tile_size + (tile_size * 14));
-        rl.drawRectangle(x, y, tile_size, tile_size, .gray);
-        rl.drawCircle(x + 32, y + 32, tile_size * 0.1, .black);
+        const tx: i32 = @intCast(@mod(index, width));
+        const ty: i32 = @intCast(@divFloor(index, height));
+        const x: i32 = @intCast(tx * tile_size);
+        const y: i32 = @intCast(ty * tile_size);
+        if (tx >= 14 and tx < 18 and ty >= 14 and ty < 18) {
+            rl.drawRectangle(x, y, tile_size, tile_size, .gray);
+            rl.drawCircle(x + 32, y + 32, tile_size * 0.1, .black);
+        } else if (tx >= 14 and tx < 18 or ty >= 14 and ty < 18) {
+            rl.drawCircle(x + 32, y + 32, tile_size * 0.1, .dark_gray);
+        }
     }
 }

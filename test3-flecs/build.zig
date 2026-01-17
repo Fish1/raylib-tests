@@ -24,8 +24,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const zflecs = zflecs_dep.module("zflecs");
-    const zflecs_artifact = zflecs_dep.artifact("zflecs");
+    const zflecs = zflecs_dep.module("root");
+    const zflecs_artifact = zflecs_dep.artifact("flecs");
 
     exe.linkLibrary(zflecs_artifact);
     exe.root_module.addImport("zflecs", zflecs);

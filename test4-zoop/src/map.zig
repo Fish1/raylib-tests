@@ -1,6 +1,7 @@
 const std = @import("std");
 const rl = @import("raylib");
 const Enemy = @import("enemy.zig").Enemy;
+const Player = @import("player.zig").Player;
 const Direction = @import("direction.zig").Direction;
 const Action = @import("action.zig").Action;
 
@@ -36,9 +37,9 @@ pub const Map = struct {
         return result;
     }
 
-    pub fn process(self: *@This(), delta: f32) void {
+    pub fn process(self: *@This(), player: *Player, delta: f32) void {
         self.time = self.time + delta;
-        if (self.time >= self.spawn_time) {
+        if (self.time >= self.spawn_time and player.state == .player_control) {
             self.time = 0.0;
             const wall = self.rand.intRangeLessThan(i32, 0, 4);
             const wall_part = self.rand.intRangeLessThan(i32, 0, 4);
@@ -137,7 +138,8 @@ pub const Map = struct {
         }
     }
 
-    pub fn remove_enemies_between(self: *@This(), x: i32, y: i32, x2: i32, y2: i32) void {
+    pub fn remove_enemies_between(self: *@This(), x: i32, y: i32, x2: i32, y2: i32) i32 {
+        var score: i32 = 0;
         for (self.enemies, 0..) |_enemy, index| {
             const enemy = _enemy orelse continue;
 
@@ -157,8 +159,10 @@ pub const Map = struct {
 
             if (x_between and y_between) {
                 self.enemies[index] = null;
+                score = score + 1;
             }
         }
+        return score;
     }
 
     pub fn get_enemy(self: *@This(), x: i32, y: i32) ?*?Enemy {
