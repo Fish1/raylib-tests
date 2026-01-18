@@ -148,7 +148,8 @@ pub const Player = struct {
                 rl.playSound(self.swap_sound);
             } else if (self.action == .score) {
                 const score: u64 = @intCast(map.remove_enemies_between(self.x, self.y, self.px, self.py));
-                self.score = self.score + std.math.pow(u64, 3, score) + @divFloor(self.score, 10);
+                const score_bonus: u64 = @divFloor(self.score, 100);
+                self.score = self.score + std.math.pow(u64, score, 3) + score_bonus;
                 rl.playSound(self.score_sound);
             }
         }

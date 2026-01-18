@@ -16,6 +16,8 @@ pub const Map = struct {
     rand: std.Random = undefined,
     enemies: [14 * 4 * 4]?Enemy = undefined,
 
+    time_total: f32 = 0.0,
+
     spawn_time: f32 = undefined,
     time: f32 = undefined,
 
@@ -23,15 +25,20 @@ pub const Map = struct {
     green_enemy: Enemy,
     blue_enemy: Enemy,
 
+    game_over_sound: rl.Sound,
+
     pub fn init() !@This() {
+        const game_over_sound = try rl.loadSound("./assets/gameover.wav");
         var result: Map = .{
-            .spawn_time = 1.0,
+            .spawn_time = 0.01,
             .time = 0.0,
 
             .enemies = std.mem.zeroes([14 * 4 * 4]?Enemy),
             .red_enemy = try Enemy.init(0, 0, 0, .red),
             .green_enemy = try Enemy.init(0, 0, 1, .green),
             .blue_enemy = try Enemy.init(0, 0, 2, .blue),
+
+            .game_over_sound = game_over_sound,
         };
 
         result.prng = .init(blk: {
@@ -44,7 +51,14 @@ pub const Map = struct {
         return result;
     }
 
+    pub fn deinit(self: *@This()) void {
+        rl.unloadSound(self.game_over_sound);
+    }
+
     pub fn process(self: *@This(), player: *Player, delta: f32) void {
+        self.time_total = self.time_total + delta;
+        self.spawn_time = (1 / (1 + (self.time_total / 300)));
+
         self.time = self.time + delta;
         if (self.time >= self.spawn_time and player.state == .player_control) {
             self.time = 0.0;
@@ -287,7 +301,6 @@ pub const Map = struct {
             };
 
             rl.drawTexturePro(enemy.texture, source, destination, .zero(), 0.0, enemy.color);
-            // rl.drawRectangle(x, y, tile_size, tile_size, enemy.color);
         }
     }
 
@@ -323,5 +336,15 @@ pub const Map = struct {
 
     pub fn get_y_down(x: i32) i32 {
         return x + 1;
+    }
+
+    pub fn is_game_over(self: *@This()) bool {
+        for (self.enemies) |_enemy| {
+            const enemy = _enemy orelse continue;
+            if (enemy.x >= 14 and enemy.x < 18 and enemy.y >= 14 and enemy.y < 18) {
+                return true;
+            }
+        }
+        return false;
     }
 };
