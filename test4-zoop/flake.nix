@@ -26,6 +26,8 @@
 					pkgs.xorg.libXfixes
 					pkgs.xorg.libXext
 					pkgs.xorg.libXcursor
+
+					pkgs.lmms
 				];
 
 				LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [pkgs.alsa-lib];
