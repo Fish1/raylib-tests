@@ -12,6 +12,8 @@ const State = enum {
     game_over,
 };
 
+var game_over_score: u64 = undefined;
+
 var camera: rl.Camera2D = .{
     .offset = .{
         .x = 0,
@@ -66,8 +68,13 @@ fn game_over_state(player: *Player, map: *Map, state: *State) void {
     rl.beginDrawing();
     defer rl.endDrawing();
 
+    var buffer: [32]u8 = undefined;
+    const score_text = std.fmt.bufPrintZ(&buffer, "You scored {d}!", .{game_over_score}) catch unreachable;
+
     rl.clearBackground(.black);
+
     rl.drawText("Game Over!", 64, 1024 / 4, 64, .white);
+    rl.drawText(score_text, 64, 1024 / 3, 64, .white);
     rl.drawText("Press Space to Play Again", 64, 1024 / 2, 64, .white);
     if (rl.isKeyPressed(.space)) {
         map.deinit();
@@ -84,6 +91,7 @@ fn game_state(player: *Player, map: *Map, state: *State) void {
     game_state_draw(player, map);
     if (map.is_game_over()) {
         rl.playSound(map.game_over_sound);
+        game_over_score = player.score;
         state.* = .game_over;
     }
 }
@@ -99,7 +107,7 @@ fn game_state_draw(player: *Player, map: *Map) void {
 
     rl.beginMode2D(camera);
     rl.clearBackground(.black);
-    draw_player_map();
+    draw_player_map(player);
     player.draw();
     map.draw();
     rl.endMode2D();
@@ -112,7 +120,7 @@ fn game_state_draw(player: *Player, map: *Map) void {
     rl.drawText(result2, 32, 64, 32, .white);
 }
 
-fn draw_player_map() void {
+fn draw_player_map(player: *Player) void {
     const width = 32;
     const height = 32;
     for (0..width * height) |index| {
@@ -124,7 +132,7 @@ fn draw_player_map() void {
             rl.drawRectangle(x, y, tile_size, tile_size, .gray);
             rl.drawCircle(x + 32, y + 32, tile_size * 0.1, .black);
         } else if (tx >= 14 and tx < 18 or ty >= 14 and ty < 18) {
-            rl.drawCircle(x + 32, y + 32, tile_size * 0.1, .dark_gray);
+            rl.drawCircle(x + 32, y + 32, tile_size * 0.1, player.color);
         }
     }
 }

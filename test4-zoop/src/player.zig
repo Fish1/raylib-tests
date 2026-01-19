@@ -167,25 +167,37 @@ pub const Player = struct {
     fn player_control_state(self: *@This(), map: *Map, delta: f32) void {
         self.e = self.e + delta * 1.5;
         self.animation = .EaseOutElastic;
-        if (rl.isKeyPressed(.right) and self.x <= 16) {
+        if (rl.isKeyPressed(.right)) {
             self.py = self.y;
             self.px = self.x;
             self.x = self.x + 1;
+            if (self.x > 17) {
+                self.x = 14;
+            }
             self.e = 0;
-        } else if (rl.isKeyPressed(.left) and self.x > 14) {
+        } else if (rl.isKeyPressed(.left)) {
             self.py = self.y;
             self.px = self.x;
             self.x = self.x - 1;
+            if (self.x < 14) {
+                self.x = 17;
+            }
             self.e = 0;
-        } else if (rl.isKeyPressed(.up) and self.y > 14) {
+        } else if (rl.isKeyPressed(.up)) {
             self.py = self.y;
             self.px = self.x;
             self.y = self.y - 1;
+            if (self.y < 14) {
+                self.y = 17;
+            }
             self.e = 0;
-        } else if (rl.isKeyPressed(.down) and self.y <= 16) {
+        } else if (rl.isKeyPressed(.down)) {
             self.py = self.y;
             self.px = self.x;
             self.y = self.y + 1;
+            if (self.y > 17) {
+                self.y = 14;
+            }
             self.e = 0;
         }
 
