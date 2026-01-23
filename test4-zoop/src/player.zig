@@ -24,6 +24,10 @@ const State = enum {
     init_laser,
     laser,
     end_laser,
+
+    init_large_laser,
+    large_laser,
+    end_large_laser,
 };
 
 pub const Player = struct {
@@ -133,10 +137,16 @@ pub const Player = struct {
             .attack => attack_state(self, delta),
             .init_attack_back => init_attack_back_state(self, map, delta),
             .attack_back => attack_back_state(self, delta),
+
             .player_control => player_control_state(self, map, delta),
+
             .init_laser => init_laser_state(self, delta),
             .laser => laser_state(self, delta),
             .end_laser => end_laser_state(self, map, delta),
+
+            .init_large_laser => init_large_laser_state(self, delta),
+            .large_laser => large_laser_state(self, delta),
+            .end_large_laser => end_large_laser_state(self, map, delta),
         }
     }
 
@@ -167,7 +177,7 @@ pub const Player = struct {
 
         rl.drawTexturePro(self.player_texture, source, destination, .zero(), 0.0, .white);
 
-        if (self.state == .laser) {
+        if (self.state == .laser or self.state == .large_laser) {
             const rlx = ease.ease(.EaseInCubic, @floatFromInt(self.laser_px), @floatFromInt(self.laser_x), self.laser_e) * 64;
             const rly = ease.ease(.EaseInCubic, @floatFromInt(self.laser_py), @floatFromInt(self.laser_y), self.laser_e) * 64;
             var rotation: f32 = undefined;
@@ -184,12 +194,17 @@ pub const Player = struct {
                 .width = @floatFromInt(self.laser_texture.width),
                 .height = @floatFromInt(self.laser_texture.height),
             };
-            const laser_destination: rl.Rectangle = .{
+            var laser_destination: rl.Rectangle = .{
                 .x = rlx + 32.0,
                 .y = rly + 32.0,
                 .width = @floatFromInt(self.laser_texture.width),
                 .height = @floatFromInt(self.laser_texture.height),
             };
+
+            if (self.state == .large_laser) {
+                laser_destination.width = laser_destination.width * 4;
+            }
+
             const origin: rl.Vector2 = .{
                 .x = @as(f32, @floatFromInt(self.laser_texture.width)) / 2.0,
                 .y = @as(f32, @floatFromInt(self.laser_texture.height)) / 2.0,
@@ -288,30 +303,65 @@ pub const Player = struct {
         self.state = .player_control;
     }
 
+    fn init_large_laser_state(self: *@This(), _: f32) void {
+        self.state = .large_laser;
+        self.laser_x = self.x;
+        self.laser_y = self.y;
+        self.laser_px = self.x;
+        self.laser_py = self.y;
+        switch (self.laser_direction) {
+            .left => self.laser_x = -1,
+            .right => self.laser_x = 32,
+            .up => self.laser_y = -1,
+            .down => self.laser_y = 32,
+        }
+        self.laser_e = 0;
+        rl.playSound(self.laser_sound);
+    }
+
+    fn large_laser_state(self: *@This(), delta: f32) void {
+        self.laser_e = self.laser_e + delta * 2.0;
+        if (self.laser_e > 1.0) {
+            self.state = .end_large_laser;
+        }
+    }
+
+    fn end_large_laser_state(self: *@This(), map: *Map, _: f32) void {
+        var score: u64 = undefined;
+        switch (self.laser_direction) {
+            .left => score = @intCast(map.remove_enemies_between(0, 0, 13, 31)),
+            .right => score = @intCast(map.remove_enemies_between(18, 0, 31, 31)),
+            .up => score = @intCast(map.remove_enemies_between(0, 0, 31, 13)),
+            .down => score = @intCast(map.remove_enemies_between(0, 18, 31, 31)),
+        }
+        const score_bonus: u64 = @divFloor(self.score, 100);
+        self.score = self.score + std.math.pow(u64, score, 3) + score_bonus;
+        rl.playSound(self.score_sound);
+        self.state = .player_control;
+    }
+
     fn shoot_power(self: *@This(), power: GemPower, direction: Direction) void {
+        self.action = .score;
+        self.laser_direction = direction;
         switch (power) {
             .laser => {
-                self.action = .score;
                 self.state = .init_laser;
-                self.laser_direction = direction;
                 self.power_laser = 0;
             },
             .large_laser => {
-                self.action = .score;
-                self.state = .init_laser;
-                self.laser_direction = direction;
+                self.state = .init_large_laser;
                 self.power_large_laser = 0;
             },
             .giant_laser => {
-                self.action = .score;
                 self.state = .init_laser;
-                self.laser_direction = direction;
                 self.power_giant_laser = 0;
             },
         }
     }
 
     fn collect_gems(self: *@This(), map: *Map, direction: Direction) void {
+        self.px = self.x;
+        self.py = self.y;
         const to = map.get_jump_to(self.x, self.y, self.gem_color, direction);
         self.x = to.x;
         self.y = to.y;
@@ -354,37 +404,24 @@ pub const Player = struct {
             self.move(.down);
         }
 
+        var action_direction: ?Direction = null;
         if (rl.isKeyPressed(.a)) {
-            self.px = self.x;
-            self.py = self.y;
-            if (self.power_laser >= 3) {
-                self.shoot_power(.laser, .left);
-            } else {
-                self.collect_gems(map, .left);
-            }
-        } else if (rl.isKeyPressed(.s)) {
-            self.px = self.x;
-            self.py = self.y;
-            if (self.power_laser >= 3) {
-                self.shoot_power(.laser, .down);
-            } else {
-                self.collect_gems(map, .down);
-            }
+            action_direction = .left;
         } else if (rl.isKeyPressed(.d)) {
-            self.px = self.x;
-            self.py = self.y;
-            if (self.power_laser >= 3) {
-                self.shoot_power(.laser, .right);
-            } else {
-                self.collect_gems(map, .right);
-            }
+            action_direction = .right;
         } else if (rl.isKeyPressed(.w)) {
-            self.px = self.x;
-            self.py = self.y;
+            action_direction = .up;
+        } else if (rl.isKeyPressed(.s)) {
+            action_direction = .down;
+        }
+
+        if (action_direction) |direction| {
             if (self.power_laser >= 3) {
-                self.shoot_power(.laser, .up);
+                self.shoot_power(.laser, direction);
+            } else if (self.power_large_laser >= 3) {
+                self.shoot_power(.large_laser, direction);
             } else {
-                self.collect_gems(map, .up);
+                self.collect_gems(map, direction);
             }
         }
     }

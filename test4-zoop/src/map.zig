@@ -63,7 +63,7 @@ pub const Map = struct {
 
     pub fn process(self: *@This(), player: *Player, delta: f32) void {
         self.time_total = self.time_total + delta;
-        self.spawn_time = (1 / (1 + (self.time_total / 3)));
+        self.spawn_time = (1 / (1 + (self.time_total / 30)));
 
         self.time = self.time + delta;
         if (self.time >= self.spawn_time and player.state == .player_control) {
