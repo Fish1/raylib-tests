@@ -3,6 +3,7 @@ const rl = @import("raylib");
 const ease = @import("ease.zig");
 const Player = @import("player.zig").Player;
 const Map = @import("map.zig").Map;
+const TextureLoader = @import("texture_loader.zig").TextureLoader;
 
 const tile_size = 64;
 
@@ -28,8 +29,6 @@ var camera: rl.Camera2D = .{
 };
 
 pub fn main() !void {
-    std.debug.print("Zoop!\n", .{});
-
     const width = 1024;
     const height = 1024;
 
@@ -40,12 +39,20 @@ pub fn main() !void {
     rl.initAudioDevice();
     rl.setTargetFPS(60);
 
-    var map: Map = try Map.init();
+    var texture_loader = try TextureLoader.init();
+    defer texture_loader.deinit();
+
+    const music: rl.Music = try rl.loadMusicStream("./assets/song.wav");
+    defer rl.unloadMusicStream(music);
+    rl.playMusicStream(music);
+
+    var map: Map = try Map.init(&texture_loader);
     defer map.deinit();
-    var player: Player = try Player.init();
+    var player: Player = try Player.init(&texture_loader);
     defer player.deinit();
 
     while (rl.windowShouldClose() == false) {
+        rl.updateMusicStream(music);
         switch (state) {
             .main_menu => main_menu_state(&state),
             .game => game_state(&player, &map, &state),
@@ -77,10 +84,8 @@ fn game_over_state(player: *Player, map: *Map, state: *State) void {
     rl.drawText(score_text, 64, 1024 / 3, 64, .white);
     rl.drawText("Press Space to Play Again", 64, 1024 / 2, 64, .white);
     if (rl.isKeyPressed(.space)) {
-        map.deinit();
-        map.* = Map.init() catch unreachable;
-        player.deinit();
-        player.* = Player.init() catch unreachable;
+        map.reset();
+        player.reset();
         state.* = .game;
     }
 }
@@ -108,16 +113,24 @@ fn game_state_draw(player: *Player, map: *Map) void {
     rl.beginMode2D(camera);
     rl.clearBackground(.black);
     draw_player_map(player);
-    player.draw();
     map.draw();
+    player.draw();
+
+    const r = 320;
+    rl.drawCircle((1024 * 2) - r - 64, (1024 * 2) - r - 64, r, .white);
     rl.endMode2D();
 
     var buffer: [32]u8 = undefined;
-    const result = std.fmt.bufPrintZ(&buffer, "Score {d}", .{player.score}) catch unreachable;
-    rl.drawText(result, 32, 32, 32, .white);
 
-    const result2 = std.fmt.bufPrintZ(&buffer, "Speed {d}", .{map.spawn_time}) catch unreachable;
-    rl.drawText(result2, 32, 64, 32, .white);
+    var result = std.fmt.bufPrintZ(&buffer, "{d}", .{player.score}) catch unreachable;
+    rl.drawText(result, 32, 32, 64, .white);
+
+    result = std.fmt.bufPrintZ(&buffer, "Laz x{d}", .{player.power_laser}) catch unreachable;
+    rl.drawText(result, 752, 1024 - (32 * 7), 32, .black);
+    result = std.fmt.bufPrintZ(&buffer, "Large Laz x{d}", .{player.power_large_laser}) catch unreachable;
+    rl.drawText(result, 752, 1024 - (32 * 6), 32, .black);
+    result = std.fmt.bufPrintZ(&buffer, "Giant Laz x{d}", .{player.power_giant_laser}) catch unreachable;
+    rl.drawText(result, 752, 1024 - (32 * 5), 32, .black);
 }
 
 fn draw_player_map(player: *Player) void {
@@ -132,7 +145,13 @@ fn draw_player_map(player: *Player) void {
             rl.drawRectangle(x, y, tile_size, tile_size, .gray);
             rl.drawCircle(x + 32, y + 32, tile_size * 0.1, .black);
         } else if (tx >= 14 and tx < 18 or ty >= 14 and ty < 18) {
-            rl.drawCircle(x + 32, y + 32, tile_size * 0.1, player.color);
+            var color: rl.Color = undefined;
+            switch (player.gem_color) {
+                .red => color = .red,
+                .green => color = .green,
+                .blue => color = .blue,
+            }
+            rl.drawCircle(x + 32, y + 32, tile_size * 0.1, color);
         }
     }
 }

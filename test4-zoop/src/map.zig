@@ -1,11 +1,14 @@
 const std = @import("std");
 const rl = @import("raylib");
+
+const TextureLoader = @import("texture_loader.zig").TextureLoader;
+
 const Enemy = @import("enemy.zig").Enemy;
 const Player = @import("player.zig").Player;
-const Direction = @import("direction.zig").Direction;
-const Action = @import("action.zig").Action;
 
-const EnemyTypes = @import("enemy_types.zig");
+const Direction = @import("types.zig").Direction;
+const Action = @import("types.zig").Action;
+const GemColor = @import("types.zig").GemColor;
 
 const width = 14;
 const height = 4;
@@ -14,6 +17,7 @@ const size = width * height;
 pub const Map = struct {
     prng: std.Random.DefaultPrng = undefined,
     rand: std.Random = undefined,
+
     enemies: [14 * 4 * 4]?Enemy = undefined,
 
     time_total: f32 = 0.0,
@@ -21,32 +25,27 @@ pub const Map = struct {
     spawn_time: f32 = undefined,
     time: f32 = undefined,
 
-    red_enemy: Enemy,
-    green_enemy: Enemy,
-    blue_enemy: Enemy,
+    enemy: Enemy,
 
     game_over_sound: rl.Sound,
 
-    pub fn init() !@This() {
+    pub fn init(texture_loader: *TextureLoader) !@This() {
         const game_over_sound = try rl.loadSound("./assets/gameover.wav");
         var result: Map = .{
             .spawn_time = 0.01,
             .time = 0.0,
-
             .enemies = std.mem.zeroes([14 * 4 * 4]?Enemy),
-            .red_enemy = try Enemy.init(0, 0, 0, .red),
-            .green_enemy = try Enemy.init(0, 0, 1, .green),
-            .blue_enemy = try Enemy.init(0, 0, 2, .blue),
-
             .game_over_sound = game_over_sound,
+
+            .enemy = undefined,
         };
 
-        result.prng = .init(blk: {
-            var seed: u64 = undefined;
-            try std.posix.getrandom(std.mem.asBytes(&seed));
-            break :blk seed;
-        });
-        result.rand = result.prng.random();
+        var prng: std.Random.Xoshiro256 = .init(1);
+        result.prng = prng;
+        result.rand = prng.random();
+
+        const enemy: Enemy = .init(0, 0, 0, 0, .red, .star, .laser, texture_loader);
+        result.enemy = enemy;
 
         return result;
     }
@@ -55,34 +54,30 @@ pub const Map = struct {
         rl.unloadSound(self.game_over_sound);
     }
 
+    pub fn reset(self: *@This()) void {
+        self.time_total = 0.0;
+        self.time = 0.0;
+        self.spawn_time = 0.01;
+        self.enemies = std.mem.zeroes([14 * 4 * 4]?Enemy);
+    }
+
     pub fn process(self: *@This(), player: *Player, delta: f32) void {
         self.time_total = self.time_total + delta;
-        self.spawn_time = (1 / (1 + (self.time_total / 300)));
+        self.spawn_time = (1 / (1 + (self.time_total / 3)));
 
         self.time = self.time + delta;
         if (self.time >= self.spawn_time and player.state == .player_control) {
             self.time = 0.0;
-            const wall = self.rand.intRangeLessThan(i32, 0, 4);
-            const wall_part = self.rand.intRangeLessThan(i32, 0, 4);
-            const enemy_rand = self.rand.intRangeLessThan(i32, 0, 4);
+            const wall: Direction = @enumFromInt(rl.getRandomValue(0, 3));
+            const wall_part: i32 = rl.getRandomValue(0, 3);
 
-            var direction: Direction = undefined;
-            switch (wall) {
-                0 => direction = .left,
-                1 => direction = .up,
-                2 => direction = .right,
-                3 => direction = .down,
-                else => direction = .left,
-            }
+            self.spawn(wall, wall_part);
+        }
 
-            var en: Enemy = undefined;
-            switch (enemy_rand) {
-                0 => en = self.red_enemy,
-                1 => en = self.green_enemy,
-                2 => en = self.blue_enemy,
-                else => en = self.red_enemy,
+        for (0..self.enemies.len) |index| {
+            if (self.enemies[index]) |*enemy| {
+                enemy.process(delta);
             }
-            self.spawn(direction, wall_part, en);
         }
     }
 
@@ -96,55 +91,55 @@ pub const Map = struct {
         }
     }
 
-    pub fn spawn(self: *@This(), direction: Direction, wall_part: i32, enemy_copy: Enemy) void {
+    pub fn spawn(self: *@This(), direction: Direction, wall_part: i32) void {
+        if (wall_part < 0 or wall_part >= 4) {
+            return;
+        }
+
         if (direction == .left) {
             const y = 14 + wall_part;
             for (&self.enemies) |*_check_enemy| {
-                const check_enemy = _check_enemy.* orelse continue;
-                if (check_enemy.y != y or check_enemy.x > 14) {
-                    continue;
-                }
-                if (_check_enemy.*) |*enemy| {
-                    enemy.*.x = enemy.*.x + 1;
+                if (_check_enemy.*) |*check_enemy| {
+                    if (check_enemy.y != y or check_enemy.x > 14) {
+                        continue;
+                    }
+                    check_enemy.move(.right);
                 }
             }
-            self.add_enemy(enemy_copy.copy_to(0, y));
+            self.add_enemy(self.enemy.copy_to(0, y, -1, y));
         } else if (direction == .up) {
             const x = 14 + wall_part;
             for (&self.enemies) |*_check_enemy| {
-                const check_enemy = _check_enemy.* orelse continue;
-                if (check_enemy.x != x or check_enemy.y > 14) {
-                    continue;
-                }
-                if (_check_enemy.*) |*enemy| {
-                    enemy.*.y = enemy.*.y + 1;
+                if (_check_enemy.*) |*check_enemy| {
+                    if (check_enemy.x != x or check_enemy.y > 14) {
+                        continue;
+                    }
+                    check_enemy.move(.down);
                 }
             }
-            self.add_enemy(enemy_copy.copy_to(x, 0));
+            self.add_enemy(self.enemy.copy_to(x, 0, x, -1));
         } else if (direction == .right) {
             const y = 14 + wall_part;
             for (&self.enemies) |*_check_enemy| {
-                const check_enemy = _check_enemy.* orelse continue;
-                if (check_enemy.y != y or check_enemy.x < 14) {
-                    continue;
-                }
-                if (_check_enemy.*) |*enemy| {
-                    enemy.*.x = enemy.*.x - 1;
+                if (_check_enemy.*) |*check_enemy| {
+                    if (check_enemy.y != y or check_enemy.x < 14) {
+                        continue;
+                    }
+                    check_enemy.move(.left);
                 }
             }
-            self.add_enemy(enemy_copy.copy_to(31, y));
+            self.add_enemy(self.enemy.copy_to(31, y, 32, y));
         } else if (direction == .down) {
             const x = 14 + wall_part;
             for (&self.enemies) |*_check_enemy| {
-                const check_enemy = _check_enemy.* orelse continue;
-                if (check_enemy.x != x or check_enemy.y < 14) {
-                    continue;
-                }
-                if (_check_enemy.*) |*enemy| {
-                    enemy.*.y = enemy.*.y - 1;
+                if (_check_enemy.*) |*check_enemy| {
+                    if (check_enemy.x != x or check_enemy.y < 14) {
+                        continue;
+                    }
+                    check_enemy.move(.up);
                 }
             }
-            self.add_enemy(enemy_copy.copy_to(x, 31));
+            self.add_enemy(self.enemy.copy_to(x, 31, x, 32));
         }
     }
 
@@ -185,17 +180,20 @@ pub const Map = struct {
         return score;
     }
 
-    pub fn get_enemy(self: *@This(), x: i32, y: i32) ?*?Enemy {
-        for (&self.enemies) |*_enemy| {
-            const enemy = _enemy.* orelse continue;
-            if (enemy.x == x and enemy.y == y) {
-                return _enemy;
+    pub fn get_enemy(self: *@This(), x: i32, y: i32) ?*Enemy {
+        for (&self.enemies) |*__enemy| {
+            const _enemy = __enemy.* orelse continue;
+            if (_enemy.x == x and _enemy.y == y) {
+                if (__enemy.*) |*enemy| {
+                    return enemy;
+                }
+                return null;
             }
         }
         return null;
     }
 
-    pub fn get_jump_to(self: *@This(), x: i32, y: i32, i: i32, direction: Direction) struct { x: i32, y: i32, action: Action } {
+    pub fn get_jump_to(self: *@This(), x: i32, y: i32, i: GemColor, direction: Direction) struct { x: i32, y: i32, action: Action } {
         var tx: i32 = undefined;
         var ty: i32 = undefined;
         var _first_enemy: ?Enemy = null;
@@ -241,7 +239,13 @@ pub const Map = struct {
 
         var action: Action = .swap;
         if (_first_enemy) |first_enemy| {
-            if (first_enemy.identifier == i) {
+            if (first_enemy.power) |power| {
+                switch (power) {
+                    .laser => action = .power_laser,
+                    .large_laser => action = .power_large_laser,
+                    .giant_laser => action = .power_giant_laser,
+                }
+            } else if (first_enemy.color == i) {
                 action = .score;
             }
         }
@@ -259,9 +263,14 @@ pub const Map = struct {
                 }
 
                 const first_enemy = _first_enemy orelse break;
-                const _new_enemy = self.get_enemy(position[0], position[1]) orelse break;
-                const new_enemy = _new_enemy.* orelse break;
-                if (new_enemy.identifier != first_enemy.identifier) {
+                const new_enemy = self.get_enemy(position[0], position[1]) orelse break;
+                if (first_enemy.power != null) {
+                    break;
+                }
+                if (new_enemy.color != first_enemy.color) {
+                    break;
+                }
+                if (new_enemy.power != null) {
                     break;
                 }
                 new_x = new_enemy.x;
@@ -279,28 +288,9 @@ pub const Map = struct {
     }
 
     pub fn draw(self: @This()) void {
-        const tile_size = 64;
-
         for (self.enemies) |_enemy| {
             const enemy = _enemy orelse continue;
-            const x: f32 = @floatFromInt(enemy.x * tile_size);
-            const y: f32 = @floatFromInt(enemy.y * tile_size);
-
-            const source: rl.Rectangle = .{
-                .x = 0,
-                .y = 0,
-                .width = 16,
-                .height = 16,
-            };
-
-            const destination: rl.Rectangle = .{
-                .x = x,
-                .y = y,
-                .width = 64,
-                .height = 64,
-            };
-
-            rl.drawTexturePro(enemy.texture, source, destination, .zero(), 0.0, enemy.color);
+            enemy.draw();
         }
     }
 
