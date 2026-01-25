@@ -7,12 +7,22 @@ const Map = @import("map.zig").Map;
 const TextureLoader = @import("texture_loader.zig").TextureLoader;
 const FontLoader = @import("font_loader.zig").FontLoader;
 
+const UIDrawer = @import("ui_drawer.zig").UIDrawer;
+
+const window_width = 1024;
+const window_height = 1024;
 const tile_size = 64;
 
 const State = enum {
     main_menu,
     game,
     game_over,
+};
+
+const Difficulty = enum {
+    easy,
+    medium,
+    hard,
 };
 
 var game_over_score: i32 = undefined;
@@ -31,12 +41,9 @@ var camera: rl.Camera2D = .{
 };
 
 pub fn main() !void {
-    const width = 1024;
-    const height = 1024;
-
     var state: State = .main_menu;
 
-    rl.initWindow(width, height, "Zoop!");
+    rl.initWindow(window_width, window_height, "Zoop!");
     defer rl.closeWindow();
     rl.initAudioDevice();
     rl.setTargetFPS(60);
@@ -46,6 +53,9 @@ pub fn main() !void {
 
     var font_loader = try FontLoader.init();
     defer font_loader.deinit();
+
+    var buffer: [512]u8 = undefined;
+    const ui_drawer = UIDrawer.init(&buffer, &texture_loader, &font_loader);
 
     const music: rl.Music = try rl.loadMusicStream("./assets/song.wav");
     defer rl.unloadMusicStream(music);
@@ -59,26 +69,21 @@ pub fn main() !void {
     while (rl.windowShouldClose() == false) {
         rl.updateMusicStream(music);
         switch (state) {
-            .main_menu => main_menu_state(&font_loader, &state),
-            .game => game_state(&font_loader, &player, &map, &state),
+            .main_menu => main_menu_state(ui_drawer, &state),
+            .game => game_state(ui_drawer, &font_loader, &player, &map, &state),
             .game_over => game_over_state(&font_loader, &player, &map, &state),
         }
     }
 }
 
-fn main_menu_state(font_loader: *FontLoader, state: *State) void {
-    rl.beginDrawing();
-    defer rl.endDrawing();
-    var position: rl.Vector2 = .{
-        .x = 64,
-        .y = 1024 / 4,
-    };
-    rl.drawTextEx(font_loader.get(.kenney_future).*, "Zoop!", position, 64, 0, .white);
-    position.y = 1024 / 2;
-    rl.drawTextEx(font_loader.get(.kenney_future).*, "Press Space to Play", position, 64, 0, .white);
+fn main_menu_state(ui_drawer: UIDrawer, state: *State) void {
     if (rl.isKeyPressed(.space)) {
         state.* = .game;
     }
+
+    rl.beginDrawing();
+    defer rl.endDrawing();
+    ui_drawer.draw_main_menu_box((window_width / 2) - (475 / 2), (window_height / 2) - (475 / 2));
 }
 
 fn game_over_state(font_loader: *FontLoader, player: *Player, map: *Map, state: *State) void {
@@ -106,10 +111,10 @@ fn game_over_state(font_loader: *FontLoader, player: *Player, map: *Map, state: 
     }
 }
 
-fn game_state(font_loader: *FontLoader, player: *Player, map: *Map, state: *State) void {
+fn game_state(ui_drawer: UIDrawer, font_loader: *FontLoader, player: *Player, map: *Map, state: *State) void {
     const delta = rl.getFrameTime();
     game_state_process(player, map, delta);
-    game_state_draw(font_loader, player, map);
+    game_state_draw(ui_drawer, font_loader, player, map);
     if (map.is_game_over()) {
         rl.playSound(map.game_over_sound);
         game_over_score = player.score;
@@ -122,7 +127,7 @@ fn game_state_process(player: *Player, map: *Map, delta: f32) void {
     player.process(map, delta);
 }
 
-fn game_state_draw(font_loader: *FontLoader, player: *Player, map: *Map) void {
+fn game_state_draw(ui_drawer: UIDrawer, font_loader: *FontLoader, player: *Player, map: *Map) void {
     rl.beginDrawing();
     defer rl.endDrawing();
 
@@ -132,28 +137,10 @@ fn game_state_draw(font_loader: *FontLoader, player: *Player, map: *Map) void {
     map.draw();
     player.draw();
     draw_interface(font_loader, player, map);
-
-    const r = 320;
-    rl.drawCircle((1024 * 2) - r - 64, (1024 * 2) - r - 64, r, .white);
     rl.endMode2D();
 
-    var buffer: [32]u8 = undefined;
-
-    var result = std.fmt.bufPrintZ(&buffer, "{d}", .{player.score}) catch unreachable;
-    rl.drawText(result, 32, 32, 64, .white);
-
-    var position: rl.Vector2 = .{
-        .x = 1024 - (32 * 9),
-        .y = 1024 - (32 * 8),
-    };
-    result = std.fmt.bufPrintZ(&buffer, "Laz x{d}", .{player.power_laser}) catch unreachable;
-    rl.drawTextEx(font_loader.get(.kenney_future).*, result, position, 32, 0, .black);
-    position.y = 1024 - (32 * 7);
-    result = std.fmt.bufPrintZ(&buffer, "Large Laz x{d}", .{player.power_large_laser}) catch unreachable;
-    rl.drawTextEx(font_loader.get(.kenney_future).*, result, position, 32, 0, .black);
-    position.y = 1024 - (32 * 6);
-    result = std.fmt.bufPrintZ(&buffer, "Giant Laz x{d}", .{player.power_giant_laser}) catch unreachable;
-    rl.drawTextEx(font_loader.get(.kenney_future).*, result, position, 32, 0, .black);
+    ui_drawer.draw_game_powerups(650, 650, player.power_laser, player.power_large_laser);
+    ui_drawer.draw_game_score(32, 32, player.score);
 }
 
 fn draw_player_map(player: *Player) void {

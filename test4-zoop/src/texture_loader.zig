@@ -14,10 +14,12 @@ pub const TextureID = enum(usize) {
     grey_diamond_gem,
     grey_pentagon_gem,
     laser,
+
+    ui_button_square_gradient,
 };
 
 pub const TextureLoader = struct {
-    textures: [13]rl.Texture,
+    textures: [14]rl.Texture,
 
     pub fn init() !@This() {
         return .{
@@ -35,6 +37,8 @@ pub const TextureLoader = struct {
                 try rl.loadTexture("./assets/grey_gems/diamond.png"),
                 try rl.loadTexture("./assets/grey_gems/pentagon.png"),
                 try rl.loadTexture("./assets/laser.png"),
+
+                try rl.loadTexture("./assets/ui/images/Blue/Double/button_square_gradient.png"),
             },
         };
     }

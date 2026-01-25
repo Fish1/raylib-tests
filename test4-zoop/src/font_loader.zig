@@ -2,15 +2,17 @@ const rl = @import("raylib");
 
 pub const FontID = enum(usize) {
     kenney_future,
+    kenney_future_narrow,
 };
 
 pub const FontLoader = struct {
-    fonts: [1]rl.Font,
+    fonts: [2]rl.Font,
 
     pub fn init() !@This() {
         return .{
             .fonts = .{
                 try rl.loadFont("./assets/fonts/kenney_future.ttf"),
+                try rl.loadFont("./assets/fonts/kenney_future_narrow.ttf"),
             },
         };
     }

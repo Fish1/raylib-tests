@@ -54,9 +54,9 @@ pub const Enemy = struct {
         const isPower = rl.getRandomValue(0, 9);
         if (isPower == 0) {
             const power_type = rl.getRandomValue(0, 9);
-            if (power_type < 5) {
+            if (power_type < 8) {
                 power = .laser;
-            } else if (power_type < 9) {
+            } else if (power_type < 10) {
                 power = .large_laser;
             } else if (power_type < 10) {
                 power = .giant_laser;
