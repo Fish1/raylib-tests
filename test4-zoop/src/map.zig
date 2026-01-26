@@ -2,6 +2,7 @@ const std = @import("std");
 const rl = @import("raylib");
 
 const TextureLoader = @import("texture_loader.zig").TextureLoader;
+const SoundLoader = @import("audio.zig").SoundLoader;
 
 const Enemy = @import("enemy.zig").Enemy;
 const Player = @import("player.zig").Player;
@@ -14,46 +15,51 @@ const width = 14;
 const height = 4;
 const size = width * height;
 
+const LevelAnnouncement = enum {
+    level,
+    number,
+};
+
 pub const Map = struct {
-    enemies: [14 * 4 * 4]?Enemy = undefined,
+    enemies: [14 * 4 * 4]?Enemy,
+    enemy_prototype: Enemy,
 
     time_total: f32 = 0.0,
 
-    spawn_time: f32 = undefined,
-    time: f32 = undefined,
+    spawn_time: f32 = 0.01,
+    time: f32 = 0.0,
 
-    enemy: Enemy,
+    can_increase_level: bool = false,
+    level: i32 = 0,
+    level_announcement_state: LevelAnnouncement = .number,
 
-    can_increase_level: bool,
-    level: i32,
+    say_hurry_up_timeout: f32 = 0.0,
 
-    pub fn init(texture_loader: *TextureLoader) !@This() {
-        var result: Map = .{
-            .spawn_time = 0.01,
-            .time = 0.0,
+    sound_loader: *SoundLoader,
+
+    pub fn init(texture_loader: *TextureLoader, sound_loader: *SoundLoader) !@This() {
+        return .{
             .enemies = std.mem.zeroes([14 * 4 * 4]?Enemy),
-            .enemy = undefined,
-            .can_increase_level = false,
-            .level = 1,
+            .enemy_prototype = .init(0, 0, 0, 0, .red, .star, .laser, texture_loader),
+            .sound_loader = sound_loader,
         };
-
-        const enemy: Enemy = .init(0, 0, 0, 0, .red, .star, .laser, texture_loader);
-        result.enemy = enemy;
-
-        return result;
     }
 
     pub fn reset(self: *@This()) void {
         self.time_total = 0.0;
-        self.time = 0.0;
         self.spawn_time = 0.01;
+        self.time = 0.0;
         self.enemies = std.mem.zeroes([14 * 4 * 4]?Enemy);
+        self.can_increase_level = false;
         self.level = 1;
+        self.say_hurry_up_timeout = 0.0;
     }
 
     pub fn process(self: *@This(), player: *Player, delta: f32) void {
         self.time_total = self.time_total + delta;
-        self.spawn_time = (1 / (1 + (self.time_total / 300)));
+        // self.spawn_time = (1 / (1 + (self.time_total / 300)));
+        self.spawn_time = self.get_spawn_time();
+        self.say_hurry_up_timeout = @max(0.0, self.say_hurry_up_timeout - delta);
         // self.spawn_time = 1.0 / @as(f32, @floatFromInt(self.level));
 
         self.time = self.time + delta;
@@ -71,19 +77,47 @@ pub const Map = struct {
             }
         }
 
-        self.can_increase_level = @as(f32, @floatFromInt(player.score)) > self.score_required_to_level_up();
+        self.can_increase_level = player.score > self.score_required_to_level_up();
 
         if (self.can_increase_level == true and rl.isKeyPressed(.space)) {
             self.level = self.level + 1;
             std.debug.print("level up = {d}\n", .{self.level});
         }
-        if (rl.isKeyPressed(.space)) {
-            std.debug.print("score required = {d}\n", .{self.score_required_to_level_up()});
+
+        if (self.say_hurry_up_timeout <= 0.0 and self.is_gem_close()) {
+            self.say_hurry_up_timeout = 20.0;
+            self.sound_loader.play(.say_hurry_up);
+        }
+
+        const next_level = self.get_current_level(player);
+        if (next_level != self.level) {
+            self.level = next_level;
+            self.level_announcement_state = .level;
+            self.sound_loader.play(.say_level);
+        }
+
+        if (self.level_announcement_state == .level) {
+            if (self.sound_loader.is_playing(.say_level) == false) {
+                self.level_announcement_state = .number;
+                switch (self.level) {
+                    1 => self.sound_loader.play(.say_one),
+                    2 => self.sound_loader.play(.say_two),
+                    3 => self.sound_loader.play(.say_three),
+                    4 => self.sound_loader.play(.say_four),
+                    5 => self.sound_loader.play(.say_five),
+                    6 => self.sound_loader.play(.say_six),
+                    7 => self.sound_loader.play(.say_seven),
+                    8 => self.sound_loader.play(.say_eight),
+                    9 => self.sound_loader.play(.say_nine),
+                    else => self.sound_loader.play(.say_ten),
+                }
+            }
         }
     }
 
-    pub fn score_required_to_level_up(self: @This()) f32 {
-        return 300 * std.math.pow(f32, 1.8, @floatFromInt(self.level));
+    pub fn score_required_to_level_up(self: @This()) i32 {
+        const result = @floor(300 * std.math.pow(f32, 1.8, @floatFromInt(self.level)));
+        return @intFromFloat(result);
     }
 
     pub fn add_enemy(self: *@This(), enemy: Enemy) void {
@@ -111,7 +145,7 @@ pub const Map = struct {
                     check_enemy.move(.right);
                 }
             }
-            self.add_enemy(self.enemy.copy_to(0, y, -1, y));
+            self.add_enemy(self.enemy_prototype.copy_to(0, y, -1, y));
         } else if (direction == .up) {
             const x = 14 + wall_part;
             for (&self.enemies) |*_check_enemy| {
@@ -122,7 +156,7 @@ pub const Map = struct {
                     check_enemy.move(.down);
                 }
             }
-            self.add_enemy(self.enemy.copy_to(x, 0, x, -1));
+            self.add_enemy(self.enemy_prototype.copy_to(x, 0, x, -1));
         } else if (direction == .right) {
             const y = 14 + wall_part;
             for (&self.enemies) |*_check_enemy| {
@@ -133,7 +167,7 @@ pub const Map = struct {
                     check_enemy.move(.left);
                 }
             }
-            self.add_enemy(self.enemy.copy_to(31, y, 32, y));
+            self.add_enemy(self.enemy_prototype.copy_to(31, y, 32, y));
         } else if (direction == .down) {
             const x = 14 + wall_part;
             for (&self.enemies) |*_check_enemy| {
@@ -144,7 +178,7 @@ pub const Map = struct {
                     check_enemy.move(.up);
                 }
             }
-            self.add_enemy(self.enemy.copy_to(x, 31, x, 32));
+            self.add_enemy(self.enemy_prototype.copy_to(x, 31, x, 32));
         }
     }
 
@@ -333,10 +367,57 @@ pub const Map = struct {
         return x + 1;
     }
 
+    pub fn get_spawn_time(self: @This()) f32 {
+        const level = self.level;
+        return (-1.0 / 10.0) * @as(f32, @floatFromInt(level)) + 1.25;
+    }
+
+    pub fn get_current_level(_: @This(), player: *Player) i32 {
+        return switch (player.score) {
+            0...99 => 1,
+            100...299 => 2,
+            300...599 => 3,
+            600...1399 => 4,
+            1400...2999 => 5,
+            3000...6199 => 6,
+            6200...12599 => 7,
+            12600...25399 => 8,
+            25400...50999 => 9,
+            else => 10,
+        };
+    }
+
+    pub fn get_score_to_levelup(self: @This(), player: *Player) i32 {
+        return switch (self.get_current_level(player)) {
+            1 => 100,
+            2 => 300,
+            3 => 600,
+            4 => 1400,
+            5 => 3000,
+            6 => 6200,
+            7 => 12600,
+            8 => 25400,
+            9 => 51000,
+            else => 100000,
+        };
+    }
+
     pub fn is_game_over(self: *@This()) bool {
         for (self.enemies) |_enemy| {
             const enemy = _enemy orelse continue;
             if (enemy.x >= 14 and enemy.x < 18 and enemy.y >= 14 and enemy.y < 18) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    pub fn is_gem_close(self: @This()) bool {
+        for (self.enemies) |_enemy| {
+            const enemy = _enemy orelse continue;
+            if (enemy.y >= 14 and enemy.y <= 17 and enemy.x >= 11 and enemy.x <= 20) {
+                return true;
+            } else if (enemy.x >= 14 and enemy.x <= 17 and enemy.y >= 11 and enemy.y <= 20) {
                 return true;
             }
         }

@@ -232,10 +232,16 @@ pub const Player = struct {
             _ = map.remove_enemies_between(self.x, self.y, self.px, self.py);
             self.power_laser = self.power_laser + 1;
             self.sound_loader.play(.powerup);
+            if (self.power_laser >= 3) {
+                self.sound_loader.play(.say_power_up);
+            }
         } else if (self.action == .power_large_laser) {
             _ = map.remove_enemies_between(self.x, self.y, self.px, self.py);
             self.power_large_laser = self.power_large_laser + 1;
             self.sound_loader.play(.powerup);
+            if (self.power_large_laser >= 3) {
+                self.sound_loader.play(.say_power_up);
+            }
         } else if (self.action == .power_giant_laser) {
             _ = map.remove_enemies_between(self.x, self.y, self.px, self.py);
             self.power_giant_laser = self.power_giant_laser + 1;

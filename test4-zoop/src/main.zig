@@ -67,7 +67,7 @@ pub fn main() !void {
 
     music_loader.play(.example);
 
-    var map: Map = try Map.init(&texture_loader);
+    var map: Map = try Map.init(&texture_loader, &sound_loader);
     var player: Player = try Player.init(&texture_loader, &sound_loader);
 
     while (rl.windowShouldClose() == false) {
@@ -131,7 +131,7 @@ fn game_state_process(player: *Player, map: *Map, delta: f32) void {
     player.process(map, delta);
 }
 
-fn game_state_draw(ui_drawer: UIDrawer, font_loader: *FontLoader, player: *Player, map: *Map) void {
+fn game_state_draw(ui_drawer: UIDrawer, _: *FontLoader, player: *Player, map: *Map) void {
     rl.beginDrawing();
     defer rl.endDrawing();
 
@@ -140,9 +140,9 @@ fn game_state_draw(ui_drawer: UIDrawer, font_loader: *FontLoader, player: *Playe
     draw_player_map(player);
     map.draw();
     player.draw();
-    draw_interface(font_loader, player, map);
     rl.endMode2D();
 
+    ui_drawer.draw_game_levelup(650, 32, map.level, player.score, map.get_score_to_levelup(player));
     ui_drawer.draw_game_powerups(650, 650, player.power_laser, player.power_large_laser);
     ui_drawer.draw_game_score(32, 32, player.score);
 }
@@ -168,24 +168,4 @@ fn draw_player_map(player: *Player) void {
             rl.drawCircle(x + 32, y + 32, tile_size * 0.1, color);
         }
     }
-}
-
-fn draw_interface(font_loader: *FontLoader, player: *Player, map: *Map) void {
-    const font_size = 52;
-    var position: rl.Vector2 = .{
-        .x = font_size * 24,
-        .y = font_size * 13,
-    };
-    var buffer: [32]u8 = undefined;
-    if (map.can_increase_level == true) {
-        const result = std.fmt.bufPrintZ(&buffer, "Press Space\n for level {d}!", .{map.level + 1}) catch unreachable;
-        rl.drawTextEx(font_loader.get(.kenney_future).*, result, position, font_size, 0, .white);
-    } else {
-        const result = std.fmt.bufPrintZ(&buffer, "{d} / {d}", .{ player.score, map.score_required_to_level_up() }) catch unreachable;
-        rl.drawTextEx(font_loader.get(.kenney_future).*, result, position, font_size, 0, .white);
-    }
-
-    position.y = font_size * 10;
-    const result = std.fmt.bufPrintZ(&buffer, "Level {d}", .{map.level}) catch unreachable;
-    rl.drawTextEx(font_loader.get(.kenney_future).*, result, position, font_size, 0, .white);
 }
