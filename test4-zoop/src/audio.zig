@@ -8,6 +8,7 @@ pub const SoundID = enum(usize) {
     powerup,
     laser,
 
+    say_you_lose,
     say_power_up,
     say_hurry_up,
     say_level,
@@ -24,7 +25,7 @@ pub const SoundID = enum(usize) {
 };
 
 pub const SoundLoader = struct {
-    sounds: [19]rl.Sound,
+    sounds: [20]rl.Sound,
 
     pub fn init() !@This() {
         return .{
@@ -36,6 +37,7 @@ pub const SoundLoader = struct {
                 try rl.loadSound("./assets/sounds/effects/powerup.wav"),
                 try rl.loadSound("./assets/sounds/effects/laser.wav"),
 
+                try rl.loadSound("./assets/sounds/voice/you_lose.ogg"),
                 try rl.loadSound("./assets/sounds/voice/power_up.ogg"),
                 try rl.loadSound("./assets/sounds/voice/hurry_up.ogg"),
                 try rl.loadSound("./assets/sounds/voice/level.ogg"),

@@ -35,8 +35,7 @@ pub const UIDrawer = struct {
     }
 
     pub fn draw_game_levelup(self: @This(), x: f32, y: f32, level: i32, current_score: i32, needed_score: i32) void {
-        self.draw_text("Level {d}", .{level}, x, y + (42 * 2), 42, .white) catch unreachable;
-        self.draw_text("{d}/{d}", .{ current_score, needed_score }, x, y + (42 * 3), 42, .white) catch unreachable;
+        self.draw_text("Level {d}\n{d}\nof\n{d}", .{ level, current_score, needed_score }, x, y, 42, .white) catch unreachable;
     }
 
     fn draw_text(self: @This(), comptime format: []const u8, args: anytype, x: f32, y: f32, size: f32, color: rl.Color) !void {

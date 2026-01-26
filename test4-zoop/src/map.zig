@@ -51,7 +51,8 @@ pub const Map = struct {
         self.time = 0.0;
         self.enemies = std.mem.zeroes([14 * 4 * 4]?Enemy);
         self.can_increase_level = false;
-        self.level = 1;
+        self.level_announcement_state = .number;
+        self.level = 0;
         self.say_hurry_up_timeout = 0.0;
     }
 

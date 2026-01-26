@@ -121,6 +121,7 @@ fn game_state(ui_drawer: UIDrawer, sound_loader: *SoundLoader, font_loader: *Fon
     game_state_draw(ui_drawer, font_loader, player, map);
     if (map.is_game_over()) {
         sound_loader.play(.game_over);
+        sound_loader.play(.say_you_lose);
         game_over_score = player.score;
         state.* = .game_over;
     }
@@ -142,9 +143,9 @@ fn game_state_draw(ui_drawer: UIDrawer, _: *FontLoader, player: *Player, map: *M
     player.draw();
     rl.endMode2D();
 
-    ui_drawer.draw_game_levelup(650, 32, map.level, player.score, map.get_score_to_levelup(player));
+    ui_drawer.draw_game_levelup(32, 32, map.level, player.score, map.get_score_to_levelup(player));
     ui_drawer.draw_game_powerups(650, 650, player.power_laser, player.power_large_laser);
-    ui_drawer.draw_game_score(32, 32, player.score);
+    // ui_drawer.draw_game_score(32, 32, player.score);
 }
 
 fn draw_player_map(player: *Player) void {
