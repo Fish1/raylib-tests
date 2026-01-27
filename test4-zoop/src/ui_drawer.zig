@@ -4,6 +4,8 @@ const rl = @import("raylib");
 const TextureLoader = @import("texture_loader.zig").TextureLoader;
 const FontLoader = @import("font_loader.zig").FontLoader;
 
+const Difficulty = @import("types.zig").Difficulty;
+
 pub const UIDrawer = struct {
     texture_loader: *TextureLoader,
     font_loader: *FontLoader,
@@ -18,16 +20,20 @@ pub const UIDrawer = struct {
         };
     }
 
-    pub fn draw_main_menu_box(self: @This(), x: f32, y: f32) void {
-        self.draw_box(x, y, 475, 475);
-        self.draw_text("Zoop!", .{}, x + 32, y + 32, 64, .black) catch unreachable;
-        self.draw_text("Press Space to Play!", .{}, x + 32, y + 32 * 4, 32, .black) catch unreachable;
+    pub fn draw_main_menu_title(self: @This(), x: f32, y: f32) void {
+        self.draw_text("Zoop!", .{}, x + 32, y + 32, 64, .white) catch unreachable;
+        self.draw_text("Press Space to Play!", .{}, x + 32, y + 32 * 4, 32, .white) catch unreachable;
+    }
+
+    pub fn draw_main_menu_difficulty_select(self: @This(), x: f32, y: f32, difficulty: Difficulty) void {
+        self.draw_text("Easy\tMedium\tHard", .{}, x, y, 32, .white) catch unreachable;
+        self.draw_circle_check(x + 23, y + 64, 32, 32, difficulty == .easy);
+        self.draw_circle_check(x + 160, y + 64, 32, 32, difficulty == .medium);
+        self.draw_circle_check(x + 295, y + 64, 32, 32, difficulty == .hard);
     }
 
     pub fn draw_game_powerups(self: @This(), x: f32, y: f32, power_laser: i32, power_large_laser: i32) void {
-        self.draw_box(x, y, 332, 332);
-        self.draw_text("Laz - {d}/3", .{power_laser}, x + 16, y + 32, 32, .black) catch unreachable;
-        self.draw_text("Large Laz - {d}/3", .{power_large_laser}, x + 16, y + 64, 32, .black) catch unreachable;
+        self.draw_text("Laz - {d}/3\nLarge Laz - {d}/3", .{ power_laser, power_large_laser }, x, y, 32, .white) catch unreachable;
     }
 
     pub fn draw_game_score(self: @This(), x: f32, y: f32, score: i32) void {
@@ -58,5 +64,19 @@ pub const UIDrawer = struct {
         const origin: rl.Vector2 = .zero();
         const rotation: f32 = 0.0;
         rl.drawTexturePro(box.*, source, destination, origin, rotation, .white);
+    }
+
+    fn draw_circle_check(self: @This(), x: f32, y: f32, width: f32, height: f32, checked: bool) void {
+        const texture = switch (checked) {
+            true => self.texture_loader.get(.ui_check_round_round_circle),
+            false => self.texture_loader.get(.ui_check_round_color),
+        };
+        const texture_width: f32 = @floatFromInt(texture.width);
+        const texture_height: f32 = @floatFromInt(texture.height);
+        const source: rl.Rectangle = .init(0, 0, texture_width, texture_height);
+        const destination: rl.Rectangle = .init(x, y, width, height);
+        const origin: rl.Vector2 = .zero();
+        const rotation: f32 = 0.0;
+        rl.drawTexturePro(texture.*, source, destination, origin, rotation, .white);
     }
 };

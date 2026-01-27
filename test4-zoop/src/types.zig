@@ -31,3 +31,9 @@ pub const GemPower = enum {
     large_laser,
     giant_laser,
 };
+
+pub const Difficulty = enum {
+    easy,
+    medium,
+    hard,
+};

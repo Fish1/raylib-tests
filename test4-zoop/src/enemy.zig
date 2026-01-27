@@ -25,8 +25,10 @@ pub const Enemy = struct {
     shape: GemShape,
     power: ?GemPower,
 
-    pub fn init(x: i32, y: i32, px: i32, py: i32, color: GemColor, shape: GemShape, power: ?GemPower, texture_loader: *TextureLoader) @This() {
-        const texture = get_texture(color, shape, power, texture_loader);
+    goal: bool,
+
+    pub fn init(x: i32, y: i32, px: i32, py: i32, color: GemColor, shape: GemShape, power: ?GemPower, goal: bool, texture_loader: *TextureLoader) @This() {
+        const texture = get_texture(color, shape, power, goal, texture_loader);
         return .{
             .x = x,
             .y = y,
@@ -43,6 +45,8 @@ pub const Enemy = struct {
             .color = color,
             .shape = shape,
             .power = power,
+
+            .goal = goal,
         };
     }
 
@@ -51,8 +55,9 @@ pub const Enemy = struct {
         const shape: GemShape = @enumFromInt(rl.getRandomValue(0, 2));
 
         var power: ?GemPower = null;
-        const isPower = rl.getRandomValue(0, 9);
-        if (isPower == 0) {
+        const is_power = rl.getRandomValue(0, 9);
+
+        if (is_power == 0) {
             const power_type = rl.getRandomValue(0, 9);
             if (power_type < 8) {
                 power = .laser;
@@ -62,7 +67,11 @@ pub const Enemy = struct {
                 power = .giant_laser;
             }
         }
-        return Enemy.init(x, y, px, py, color, shape, power, self.texture_loader);
+
+        var goal = is_power >= 1 and is_power <= 2;
+        goal = false;
+
+        return Enemy.init(x, y, px, py, color, shape, power, goal, self.texture_loader);
     }
 
     pub fn process(self: *@This(), delta: f32) void {
@@ -95,12 +104,27 @@ pub const Enemy = struct {
         rl.drawTexturePro(self.texture.*, source, destination, origin, self.rotation, .white);
     }
 
+    pub fn set_location(self: *@This(), x: i32, y: i32, px: i32, py: i32) void {
+        self.x = x;
+        self.y = y;
+        self.px = px;
+        self.py = py;
+    }
+
     pub fn set_type(self: *@This(), color: GemColor, shape: GemShape) void {
         self.rotation_velocity = 900;
         self.color = color;
         self.shape = shape;
-        const new_texture: *rl.Texture = get_texture(color, shape, self.power, self.texture_loader);
+        const new_texture: *rl.Texture = get_texture(color, shape, self.power, self.goal, self.texture_loader);
         self.texture = new_texture;
+    }
+
+    pub fn set_power(self: *@This(), power: ?GemPower) void {
+        self.power = power;
+    }
+
+    pub fn set_goal(self: *@This(), goal: bool) void {
+        self.goal = goal;
     }
 
     pub fn move(self: *@This(), direction: Direction) void {
@@ -126,7 +150,7 @@ pub const Enemy = struct {
         }
     }
 
-    pub fn get_texture(color: GemColor, shape: GemShape, power: ?GemPower, texture_loader: *TextureLoader) *rl.Texture {
+    pub fn get_texture(color: GemColor, shape: GemShape, power: ?GemPower, goal: bool, texture_loader: *TextureLoader) *rl.Texture {
         var texture: *rl.Texture = undefined;
         if (color == .red) {
             switch (shape) {
@@ -154,6 +178,10 @@ pub const Enemy = struct {
                 .large_laser => texture = texture_loader.get(.grey_diamond_gem),
                 .giant_laser => texture = texture_loader.get(.grey_star_gem),
             }
+        }
+
+        if (goal == true) {
+            texture = texture_loader.get(.goal);
         }
 
         return texture;

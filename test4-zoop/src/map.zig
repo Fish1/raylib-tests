@@ -10,6 +10,8 @@ const Player = @import("player.zig").Player;
 const Direction = @import("types.zig").Direction;
 const Action = @import("types.zig").Action;
 const GemColor = @import("types.zig").GemColor;
+const GemPower = @import("types.zig").GemPower;
+const Difficulty = @import("types.zig").Difficulty;
 
 const width = 14;
 const height = 4;
@@ -37,10 +39,12 @@ pub const Map = struct {
 
     sound_loader: *SoundLoader,
 
+    difficulty: Difficulty = .medium,
+
     pub fn init(texture_loader: *TextureLoader, sound_loader: *SoundLoader) !@This() {
         return .{
             .enemies = std.mem.zeroes([14 * 4 * 4]?Enemy),
-            .enemy_prototype = .init(0, 0, 0, 0, .red, .star, .laser, texture_loader),
+            .enemy_prototype = .init(0, 0, 0, 0, .red, .star, .laser, false, texture_loader),
             .sound_loader = sound_loader,
         };
     }
@@ -54,6 +58,10 @@ pub const Map = struct {
         self.level_announcement_state = .number;
         self.level = 0;
         self.say_hurry_up_timeout = 0.0;
+    }
+
+    pub fn set_difficulty(self: *@This(), difficulty: Difficulty) void {
+        self.difficulty = difficulty;
     }
 
     pub fn process(self: *@This(), player: *Player, delta: f32) void {
@@ -146,7 +154,21 @@ pub const Map = struct {
                     check_enemy.move(.right);
                 }
             }
-            self.add_enemy(self.enemy_prototype.copy_to(0, y, -1, y));
+            var new_enemy = self.enemy_prototype.copy_to(0, y, -1, y);
+            var power: ?GemPower = null;
+            const is_power = rl.getRandomValue(0, 9);
+            if (is_power == 0) {
+                const power_type = rl.getRandomValue(0, 9);
+                if (power_type < 8) {
+                    power = .laser;
+                } else if (power_type < 10) {
+                    power = .large_laser;
+                } else if (power_type < 10) {
+                    power = .giant_laser;
+                }
+            }
+            new_enemy.set_power(power);
+            self.add_enemy(new_enemy);
         } else if (direction == .up) {
             const x = 14 + wall_part;
             for (&self.enemies) |*_check_enemy| {
@@ -370,7 +392,11 @@ pub const Map = struct {
 
     pub fn get_spawn_time(self: @This()) f32 {
         const level = self.level;
-        return (-1.0 / 10.0) * @as(f32, @floatFromInt(level)) + 1.25;
+        return switch (self.difficulty) {
+            .easy => (-1.0 / 12.0) * @as(f32, @floatFromInt(level)) + 1.25,
+            .medium => (-1.0 / 10.0) * @as(f32, @floatFromInt(level)) + 1.25,
+            .hard => (-1.0 / 9.0) * @as(f32, @floatFromInt(level)) + 1.25,
+        };
     }
 
     pub fn get_current_level(_: @This(), player: *Player) i32 {

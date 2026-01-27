@@ -11,6 +11,8 @@ const MusicLoader = @import("audio.zig").MusicLoader;
 
 const UIDrawer = @import("ui_drawer.zig").UIDrawer;
 
+const Difficulty = @import("types.zig").Difficulty;
+
 const window_width = 1024;
 const window_height = 1024;
 const tile_size = 64;
@@ -19,12 +21,6 @@ const State = enum {
     main_menu,
     game,
     game_over,
-};
-
-const Difficulty = enum {
-    easy,
-    medium,
-    hard,
 };
 
 var game_over_score: i32 = undefined;
@@ -44,6 +40,7 @@ var camera: rl.Camera2D = .{
 
 pub fn main() !void {
     var state: State = .main_menu;
+    var difficulty: Difficulty = .medium;
 
     rl.initWindow(window_width, window_height, "Zoop!");
     defer rl.closeWindow();
@@ -73,21 +70,38 @@ pub fn main() !void {
     while (rl.windowShouldClose() == false) {
         music_loader.update();
         switch (state) {
-            .main_menu => main_menu_state(ui_drawer, &state),
+            .main_menu => main_menu_state(ui_drawer, &state, &map, &difficulty),
             .game => game_state(ui_drawer, &sound_loader, &font_loader, &player, &map, &state),
             .game_over => game_over_state(&font_loader, &player, &map, &state),
         }
     }
 }
 
-fn main_menu_state(ui_drawer: UIDrawer, state: *State) void {
+fn main_menu_state(ui_drawer: UIDrawer, state: *State, map: *Map, difficulty: *Difficulty) void {
     if (rl.isKeyPressed(.space)) {
         state.* = .game;
     }
 
     rl.beginDrawing();
     defer rl.endDrawing();
-    ui_drawer.draw_main_menu_box((window_width / 2) - (475 / 2), (window_height / 2) - (475 / 2));
+    ui_drawer.draw_main_menu_title((window_width / 2) - (475 / 2), (window_height / 2) - (475 / 2));
+    ui_drawer.draw_main_menu_difficulty_select(32, 32, difficulty.*);
+
+    if (rl.isKeyPressed(.left)) {
+        difficulty.* = switch (difficulty.*) {
+            .easy => .easy,
+            .medium => .easy,
+            .hard => .medium,
+        };
+        map.set_difficulty(difficulty.*);
+    } else if (rl.isKeyPressed(.right)) {
+        difficulty.* = switch (difficulty.*) {
+            .easy => .medium,
+            .medium => .hard,
+            .hard => .hard,
+        };
+        map.set_difficulty(difficulty.*);
+    }
 }
 
 fn game_over_state(font_loader: *FontLoader, player: *Player, map: *Map, state: *State) void {
@@ -144,29 +158,59 @@ fn game_state_draw(ui_drawer: UIDrawer, _: *FontLoader, player: *Player, map: *M
     rl.endMode2D();
 
     ui_drawer.draw_game_levelup(32, 32, map.level, player.score, map.get_score_to_levelup(player));
-    ui_drawer.draw_game_powerups(650, 650, player.power_laser, player.power_large_laser);
-    // ui_drawer.draw_game_score(32, 32, player.score);
+    ui_drawer.draw_game_powerups(64 * 10, 64 * 5, player.power_laser, player.power_large_laser);
 }
 
 fn draw_player_map(player: *Player) void {
-    const width = 32;
-    const height = 32;
-    for (0..width * height) |index| {
-        const tx: i32 = @intCast(@mod(index, width));
-        const ty: i32 = @intCast(@divFloor(index, height));
+    const color: rl.Color = switch (player.gem_color) {
+        .red => .red,
+        .green => .green,
+        .blue => .blue,
+    };
+
+    for (0..16) |square| {
+        const width = 4;
+        const tx: i32 = @intCast(@mod(square, width));
+        const ty: i32 = @intCast(@divFloor(square, width));
+        const x: i32 = @intCast(tx * tile_size + tile_size * 14);
+        const y: i32 = @intCast(ty * tile_size + tile_size * 14);
+        rl.drawRectangle(x, y, tile_size, tile_size, .gray);
+        rl.drawCircle(x + 32, y + 32, tile_size * 0.1, .black);
+    }
+
+    for (0..14 * 4) |dot| {
+        const _width = 14;
+        const tx: i32 = @intCast(@mod(dot, _width));
+        const ty: i32 = @intCast(@divFloor(dot, _width));
         const x: i32 = @intCast(tx * tile_size);
+        const y: i32 = @intCast((ty * tile_size) + (tile_size * 14));
+        rl.drawCircle(x + 32, y + 32, tile_size * 0.1, color);
+    }
+
+    for (0..14 * 4) |dot| {
+        const _width = 4;
+        const tx: i32 = @intCast(@mod(dot, _width));
+        const ty: i32 = @intCast(@divFloor(dot, _width));
+        const x: i32 = @intCast(tx * tile_size + tile_size * 14);
         const y: i32 = @intCast(ty * tile_size);
-        if (tx >= 14 and tx < 18 and ty >= 14 and ty < 18) {
-            rl.drawRectangle(x, y, tile_size, tile_size, .gray);
-            rl.drawCircle(x + 32, y + 32, tile_size * 0.1, .black);
-        } else if (tx >= 14 and tx < 18 or ty >= 14 and ty < 18) {
-            var color: rl.Color = undefined;
-            switch (player.gem_color) {
-                .red => color = .red,
-                .green => color = .green,
-                .blue => color = .blue,
-            }
-            rl.drawCircle(x + 32, y + 32, tile_size * 0.1, color);
-        }
+        rl.drawCircle(x + 32, y + 32, tile_size * 0.1, color);
+    }
+
+    for (0..14 * 4) |dot| {
+        const _width = 14;
+        const tx: i32 = @intCast(@mod(dot, _width));
+        const ty: i32 = @intCast(@divFloor(dot, _width));
+        const x: i32 = @intCast(tx * tile_size + tile_size * 18);
+        const y: i32 = @intCast(ty * tile_size + tile_size * 14);
+        rl.drawCircle(x + 32, y + 32, tile_size * 0.1, color);
+    }
+
+    for (0..14 * 4) |dot| {
+        const _width = 4;
+        const tx: i32 = @intCast(@mod(dot, _width));
+        const ty: i32 = @intCast(@divFloor(dot, _width));
+        const x: i32 = @intCast(tx * tile_size + tile_size * 14);
+        const y: i32 = @intCast(ty * tile_size + tile_size * 18);
+        rl.drawCircle(x + 32, y + 32, tile_size * 0.1, color);
     }
 }

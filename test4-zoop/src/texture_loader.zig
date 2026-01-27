@@ -14,14 +14,17 @@ pub const TextureID = enum(usize) {
     grey_diamond_gem,
     grey_pentagon_gem,
     laser,
+    goal,
 
     player,
 
     ui_button_square_gradient,
+    ui_check_round_color,
+    ui_check_round_round_circle,
 };
 
 pub const TextureLoader = struct {
-    textures: [15]rl.Texture,
+    textures: [18]rl.Texture,
 
     pub fn init() !@This() {
         return .{
@@ -39,10 +42,13 @@ pub const TextureLoader = struct {
                 try rl.loadTexture("./assets/images/grey_gems/diamond.png"),
                 try rl.loadTexture("./assets/images/grey_gems/pentagon.png"),
                 try rl.loadTexture("./assets/images/laser.png"),
+                try rl.loadTexture("./assets/images/goal.png"),
 
                 try rl.loadTexture("./assets/images/player.png"),
 
                 try rl.loadTexture("./assets/ui/images/Blue/Double/button_square_gradient.png"),
+                try rl.loadTexture("./assets/ui/images/Blue/Double/check_round_color.png"),
+                try rl.loadTexture("./assets/ui/images/Blue/Double/check_round_round_circle.png"),
             },
         };
     }
