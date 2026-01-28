@@ -23,10 +23,13 @@ pub const SoundID = enum(usize) {
     say_eight,
     say_nine,
     say_ten,
+
+    ui_switch_a,
+    ui_switch_b,
 };
 
 pub const SoundLoader = struct {
-    sounds: [20]rl.Sound,
+    sounds: [22]rl.Sound,
 
     pub fn init() !@This() {
         return .{
@@ -52,6 +55,9 @@ pub const SoundLoader = struct {
                 try rl.loadSound("./assets/sounds/voice/8.ogg"),
                 try rl.loadSound("./assets/sounds/voice/9.ogg"),
                 try rl.loadSound("./assets/sounds/voice/10.ogg"),
+
+                try rl.loadSound("./assets/sounds/ui/switch-a.ogg"),
+                try rl.loadSound("./assets/sounds/ui/switch-b.ogg"),
             },
         };
     }
@@ -111,6 +117,14 @@ pub const SoundQueue = struct {
                 rl.playSound(new_sound.*);
             }
         }
+    }
+
+    pub fn clear(self: *@This()) void {
+        const current_sound = self.queue[self.current] orelse return;
+        rl.stopSound(current_sound.*);
+        self.queue = std.mem.zeroes([10]?*rl.Sound);
+        self.current = 0;
+        self.end = 0;
     }
 
     fn is_full(self: @This()) bool {

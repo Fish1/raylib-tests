@@ -4,6 +4,7 @@ const rl = @import("raylib");
 const TextureLoader = @import("texture_loader.zig").TextureLoader;
 const SoundLoader = @import("audio.zig").SoundLoader;
 const SoundQueue = @import("audio.zig").SoundQueue;
+const SoundID = @import("audio.zig").SoundID;
 
 const Enemy = @import("enemy.zig").Enemy;
 const Player = @import("player.zig").Player;
@@ -97,33 +98,29 @@ pub const Map = struct {
 
         if (self.say_hurry_up_timeout <= 0.0 and self.is_gem_close()) {
             self.say_hurry_up_timeout = 20.0;
-            self.sound_loader.play(.say_hurry_up);
+            _ = self.announcement_sound_queue.add(self.sound_loader.get(.say_hurry_up));
         }
 
         const next_level = self.get_current_level(player);
         if (next_level != self.level) {
+            _ = self.announcement_sound_queue.add(self.sound_loader.get(.say_level));
+            const sound_id: SoundID = switch (next_level) {
+                1 => .say_one,
+                2 => .say_two,
+                3 => .say_three,
+                4 => .say_four,
+                5 => .say_five,
+                6 => .say_six,
+                7 => .say_seven,
+                8 => .say_eight,
+                9 => .say_nine,
+                else => .say_ten,
+            };
+            _ = self.announcement_sound_queue.add(self.sound_loader.get(sound_id));
             self.level = next_level;
-            self.level_announcement_state = .level;
-            self.sound_loader.play(.say_level);
         }
 
-        if (self.level_announcement_state == .level) {
-            if (self.sound_loader.is_playing(.say_level) == false) {
-                self.level_announcement_state = .number;
-                switch (self.level) {
-                    1 => self.sound_loader.play(.say_one),
-                    2 => self.sound_loader.play(.say_two),
-                    3 => self.sound_loader.play(.say_three),
-                    4 => self.sound_loader.play(.say_four),
-                    5 => self.sound_loader.play(.say_five),
-                    6 => self.sound_loader.play(.say_six),
-                    7 => self.sound_loader.play(.say_seven),
-                    8 => self.sound_loader.play(.say_eight),
-                    9 => self.sound_loader.play(.say_nine),
-                    else => self.sound_loader.play(.say_ten),
-                }
-            }
-        }
+        self.announcement_sound_queue.process();
     }
 
     pub fn score_required_to_level_up(self: @This()) i32 {
@@ -170,6 +167,7 @@ pub const Map = struct {
                 }
             }
             new_enemy.set_power(power);
+            new_enemy.update_texture();
             self.add_enemy(new_enemy);
         } else if (direction == .up) {
             const x = 14 + wall_part;

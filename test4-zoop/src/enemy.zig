@@ -150,7 +150,40 @@ pub const Enemy = struct {
         }
     }
 
-    pub fn get_texture(color: GemColor, shape: GemShape, power: ?GemPower, goal: bool, texture_loader: *TextureLoader) *rl.Texture {
+    pub fn update_texture(self: *@This()) void {
+        var texture: *rl.Texture = undefined;
+        if (self.color == .red) {
+            switch (self.shape) {
+                .star => texture = self.texture_loader.get(.red_star_gem),
+                .diamond => texture = self.texture_loader.get(.red_diamond_gem),
+                .pentagon => texture = self.texture_loader.get(.red_pentagon_gem),
+            }
+        } else if (self.color == .green) {
+            switch (self.shape) {
+                .star => texture = self.texture_loader.get(.green_star_gem),
+                .diamond => texture = self.texture_loader.get(.green_diamond_gem),
+                .pentagon => texture = self.texture_loader.get(.green_pentagon_gem),
+            }
+        } else if (self.color == .blue) {
+            switch (self.shape) {
+                .star => texture = self.texture_loader.get(.blue_star_gem),
+                .diamond => texture = self.texture_loader.get(.blue_diamond_gem),
+                .pentagon => texture = self.texture_loader.get(.blue_pentagon_gem),
+            }
+        }
+
+        if (self.power) |p| {
+            switch (p) {
+                .laser => texture = self.texture_loader.get(.grey_pentagon_gem),
+                .large_laser => texture = self.texture_loader.get(.grey_diamond_gem),
+                .giant_laser => texture = self.texture_loader.get(.grey_star_gem),
+            }
+        }
+
+        self.texture = texture;
+    }
+
+    pub fn get_texture(color: GemColor, shape: GemShape, power: ?GemPower, _: bool, texture_loader: *TextureLoader) *rl.Texture {
         var texture: *rl.Texture = undefined;
         if (color == .red) {
             switch (shape) {
@@ -178,10 +211,6 @@ pub const Enemy = struct {
                 .large_laser => texture = texture_loader.get(.grey_diamond_gem),
                 .giant_laser => texture = texture_loader.get(.grey_star_gem),
             }
-        }
-
-        if (goal == true) {
-            texture = texture_loader.get(.goal);
         }
 
         return texture;

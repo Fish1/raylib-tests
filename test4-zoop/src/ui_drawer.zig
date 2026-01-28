@@ -21,8 +21,8 @@ pub const UIDrawer = struct {
     }
 
     pub fn draw_main_menu_title(self: @This(), x: f32, y: f32) void {
-        self.draw_text("Zoop!", .{}, x + 32, y + 32, 64, .white) catch unreachable;
-        self.draw_text("Press Space to Play!", .{}, x + 32, y + 32 * 4, 32, .white) catch unreachable;
+        self.draw_text("Zoop!", .{}, x, y, 64, .white) catch unreachable;
+        self.draw_text("Press Space to Play!", .{}, x, y + 32 * 4, 32, .white) catch unreachable;
     }
 
     pub fn draw_main_menu_difficulty_select(self: @This(), x: f32, y: f32, difficulty: Difficulty) void {

@@ -9,6 +9,8 @@ const FontLoader = @import("font_loader.zig").FontLoader;
 const SoundLoader = @import("audio.zig").SoundLoader;
 const MusicLoader = @import("audio.zig").MusicLoader;
 
+const SoundQueue = @import("audio.zig").SoundQueue;
+
 const UIDrawer = @import("ui_drawer.zig").UIDrawer;
 
 const Difficulty = @import("types.zig").Difficulty;
@@ -59,6 +61,8 @@ pub fn main() !void {
     var music_loader = try MusicLoader.init();
     defer music_loader.deinit();
 
+    var ui_sound_queue = SoundQueue{};
+
     var buffer: [512]u8 = undefined;
     const ui_drawer = UIDrawer.init(&buffer, &texture_loader, &font_loader);
 
@@ -70,14 +74,14 @@ pub fn main() !void {
     while (rl.windowShouldClose() == false) {
         music_loader.update();
         switch (state) {
-            .main_menu => main_menu_state(ui_drawer, &state, &map, &difficulty),
+            .main_menu => main_menu_state(ui_drawer, &ui_sound_queue, &sound_loader, &state, &map, &difficulty),
             .game => game_state(ui_drawer, &sound_loader, &font_loader, &player, &map, &state),
             .game_over => game_over_state(&font_loader, &player, &map, &state),
         }
     }
 }
 
-fn main_menu_state(ui_drawer: UIDrawer, state: *State, map: *Map, difficulty: *Difficulty) void {
+fn main_menu_state(ui_drawer: UIDrawer, ui_sound_queue: *SoundQueue, sound_loader: *SoundLoader, state: *State, map: *Map, difficulty: *Difficulty) void {
     if (rl.isKeyPressed(.space)) {
         state.* = .game;
     }
@@ -85,9 +89,12 @@ fn main_menu_state(ui_drawer: UIDrawer, state: *State, map: *Map, difficulty: *D
     rl.beginDrawing();
     defer rl.endDrawing();
     ui_drawer.draw_main_menu_title((window_width / 2) - (475 / 2), (window_height / 2) - (475 / 2));
-    ui_drawer.draw_main_menu_difficulty_select(32, 32, difficulty.*);
+    ui_drawer.draw_main_menu_difficulty_select((window_width / 2) - (475 / 2), 530, difficulty.*);
 
     if (rl.isKeyPressed(.left)) {
+        ui_sound_queue.clear();
+        _ = ui_sound_queue.add(sound_loader.get(.ui_switch_a));
+        _ = ui_sound_queue.add(sound_loader.get(.ui_switch_b));
         difficulty.* = switch (difficulty.*) {
             .easy => .easy,
             .medium => .easy,
@@ -95,6 +102,9 @@ fn main_menu_state(ui_drawer: UIDrawer, state: *State, map: *Map, difficulty: *D
         };
         map.set_difficulty(difficulty.*);
     } else if (rl.isKeyPressed(.right)) {
+        ui_sound_queue.clear();
+        _ = ui_sound_queue.add(sound_loader.get(.ui_switch_a));
+        _ = ui_sound_queue.add(sound_loader.get(.ui_switch_b));
         difficulty.* = switch (difficulty.*) {
             .easy => .medium,
             .medium => .hard,
@@ -102,6 +112,8 @@ fn main_menu_state(ui_drawer: UIDrawer, state: *State, map: *Map, difficulty: *D
         };
         map.set_difficulty(difficulty.*);
     }
+
+    ui_sound_queue.process();
 }
 
 fn game_over_state(font_loader: *FontLoader, player: *Player, map: *Map, state: *State) void {
