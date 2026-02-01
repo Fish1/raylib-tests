@@ -34,7 +34,6 @@ pub const Map = struct {
     spawn_time: f32 = 0.01,
     time: f32 = 0.0,
 
-    can_increase_level: bool = false,
     level: i32 = 0,
     level_announcement_state: LevelAnnouncement = .number,
 
@@ -61,7 +60,6 @@ pub const Map = struct {
         self.spawn_time = 0.01;
         self.time = 0.0;
         self.enemies = std.mem.zeroes([14 * 4 * 4]?Enemy);
-        self.can_increase_level = false;
         self.level_announcement_state = .number;
         self.level = 0;
         self.say_hurry_up_timeout = 0.0;
@@ -93,21 +91,14 @@ pub const Map = struct {
             }
         }
 
-        self.can_increase_level = player.score > self.score_required_to_level_up();
-
-        if (self.can_increase_level == true and rl.isKeyPressed(.space)) {
-            self.level = self.level + 1;
-            std.debug.print("level up = {d}\n", .{self.level});
-        }
-
         if (self.say_hurry_up_timeout <= 0.0 and self.is_gem_close()) {
             self.say_hurry_up_timeout = 20.0;
-            _ = self.announcement_sound_queue.add(self.sound_loader.get(.say_hurry_up));
+            self.announcement_sound_queue.add(self.sound_loader.get(.say_hurry_up)) catch unreachable;
         }
 
         const next_level = self.get_current_level(player);
         if (next_level != self.level) {
-            _ = self.announcement_sound_queue.add(self.sound_loader.get(.say_level));
+            self.announcement_sound_queue.add(self.sound_loader.get(.say_level)) catch unreachable;
             const sound_id: SoundID = switch (next_level) {
                 1 => .say_one,
                 2 => .say_two,
@@ -120,7 +111,7 @@ pub const Map = struct {
                 9 => .say_nine,
                 else => .say_ten,
             };
-            _ = self.announcement_sound_queue.add(self.sound_loader.get(sound_id));
+            self.announcement_sound_queue.add(self.sound_loader.get(sound_id)) catch unreachable;
             if (next_level == 1) {
                 self.music_loader.play(.easy_song, 2.0, 15.0);
             } else if (self.level < 4 and next_level >= 4 and next_level <= 7) {

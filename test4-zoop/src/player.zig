@@ -65,6 +65,10 @@ pub const Player = struct {
 
     sound_loader: *SoundLoader,
 
+    pickup_speed_multiplier: i32 = 1,
+    pickup_speed_multiplier_timer: f32 = 0.0,
+    pickup_speed_multiplier_timer_reset: f32 = 4.0,
+
     pub fn init(texture_loader: *TextureLoader, sound_loader: *SoundLoader) !@This() {
         return .{
             .x = 16,
@@ -128,6 +132,26 @@ pub const Player = struct {
             .large_laser => large_laser_state(self, delta),
             .end_large_laser => end_large_laser_state(self, map, delta),
         }
+    }
+
+    pub fn get_score_bonus(self: @This()) i32 {
+        return @divFloor(self.score, 100);
+    }
+
+    pub fn get_score_multiplier(self: @This()) i32 {
+        return self.pickup_speed_multiplier;
+    }
+
+    pub fn get_score_per_gem_exponential(_: @This()) i32 {
+        return 3;
+    }
+
+    pub fn get_score_per_gem(self: @This()) i32 {
+        return @max(@divFloor(self.score, 1000), 1);
+    }
+
+    pub fn calculate_score(self: @This(), gems: i32) i32 {
+        return std.math.pow(i32, gems * self.get_score_per_gem(), self.get_score_per_gem_exponential()) * self.get_score_multiplier() + self.get_score_bonus();
     }
 
     pub fn draw(self: @This()) void {
@@ -224,10 +248,11 @@ pub const Player = struct {
             self.gem_color = enemy_color;
             self.sound_loader.play(.swap);
         } else if (self.action == .score) {
-            const score: i32 = @intCast(map.remove_enemies_between(self.x, self.y, self.px, self.py));
-            const score_bonus: i32 = @divFloor(self.score, 100);
-            self.score = self.score + std.math.pow(i32, score, 3) + score_bonus;
+            const gems = map.remove_enemies_between(self.x, self.y, self.px, self.py);
+            self.score = self.score + self.calculate_score(gems);
             self.sound_loader.play(.score);
+            self.pickup_speed_multiplier_timer = self.pickup_speed_multiplier_timer_reset;
+            self.pickup_speed_multiplier = @min(self.pickup_speed_multiplier + 1, 5);
         } else if (self.action == .power_laser) {
             _ = map.remove_enemies_between(self.x, self.y, self.px, self.py);
             self.power_laser = self.power_laser + 1;
@@ -380,6 +405,11 @@ pub const Player = struct {
     fn player_control_state(self: *@This(), map: *Map, delta: f32) void {
         self.e = self.e + delta * 1.5;
         self.animation = .EaseOutElastic;
+        self.pickup_speed_multiplier_timer = @max(self.pickup_speed_multiplier_timer - delta, 0.0);
+        if (self.pickup_speed_multiplier_timer <= 0) {
+            self.pickup_speed_multiplier = 1.0;
+        }
+
         if (rl.isKeyPressed(.right)) {
             self.move(.right);
         } else if (rl.isKeyPressed(.left)) {

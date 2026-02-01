@@ -83,14 +83,18 @@ pub const SoundLoader = struct {
     }
 };
 
+const SoundQueueError = error{
+    OutOfMemory,
+};
+
 pub const SoundQueue = struct {
     queue: [10]?*rl.Sound = std.mem.zeroes([10]?*rl.Sound),
     current: usize = 0,
     end: usize = 0,
 
-    pub fn add(self: *@This(), sound: *rl.Sound) bool {
+    pub fn add(self: *@This(), sound: *rl.Sound) SoundQueueError!void {
         if (self.is_full()) {
-            return false;
+            return SoundQueueError.OutOfMemory;
         }
 
         self.queue[self.end] = sound;
@@ -101,7 +105,6 @@ pub const SoundQueue = struct {
             }
         }
         self.increment_end();
-        return true;
     }
 
     pub fn process(self: *@This()) void {
@@ -199,13 +202,8 @@ pub const MusicLoader = struct {
     }
 
     pub fn process(self: *@This(), delta: f32) void {
-        for (&self.music) |*music| {
-            if (rl.isMusicStreamPlaying(music.*) == true) {
-                rl.updateMusicStream(music.*);
-            }
-        }
-
         const current_music = self.current_music orelse return;
+        rl.updateMusicStream(self.get(current_music).*);
 
         if (self.next_music) |next_music| {
             self.volume = @max(self.volume - (delta / self.out_duration), 0.0);

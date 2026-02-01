@@ -15,9 +15,9 @@ const UIDrawer = @import("ui_drawer.zig").UIDrawer;
 
 const Difficulty = @import("types.zig").Difficulty;
 
-const window_width = 1024;
-const window_height = 1024;
-const tile_size = 64;
+const window_width = @import("global.zig").WINDOW_WIDTH;
+const window_height = @import("global.zig").WINDOW_HEIGHT;
+const tile_size = @import("global.zig").TILE_WIDTH;
 
 const State = enum {
     main_menu,
@@ -93,8 +93,8 @@ fn main_menu_state(ui_drawer: UIDrawer, ui_sound_queue: *SoundQueue, sound_loade
 
     if (rl.isKeyPressed(.left)) {
         ui_sound_queue.clear();
-        _ = ui_sound_queue.add(sound_loader.get(.ui_switch_a));
-        _ = ui_sound_queue.add(sound_loader.get(.ui_switch_b));
+        ui_sound_queue.add(sound_loader.get(.ui_switch_a)) catch unreachable;
+        ui_sound_queue.add(sound_loader.get(.ui_switch_b)) catch unreachable;
         difficulty.* = switch (difficulty.*) {
             .easy => .easy,
             .medium => .easy,
@@ -103,8 +103,8 @@ fn main_menu_state(ui_drawer: UIDrawer, ui_sound_queue: *SoundQueue, sound_loade
         map.set_difficulty(difficulty.*);
     } else if (rl.isKeyPressed(.right)) {
         ui_sound_queue.clear();
-        _ = ui_sound_queue.add(sound_loader.get(.ui_switch_a));
-        _ = ui_sound_queue.add(sound_loader.get(.ui_switch_b));
+        ui_sound_queue.add(sound_loader.get(.ui_switch_a)) catch unreachable;
+        ui_sound_queue.add(sound_loader.get(.ui_switch_b)) catch unreachable;
         difficulty.* = switch (difficulty.*) {
             .easy => .medium,
             .medium => .hard,
@@ -172,6 +172,7 @@ fn game_state_draw(ui_drawer: UIDrawer, _: *FontLoader, player: *Player, map: *M
 
     ui_drawer.draw_game_levelup(32, 32, map.level, player.score, map.get_score_to_levelup(player));
     ui_drawer.draw_game_powerups(64 * 10, 64 * 5, player.power_laser, player.power_large_laser);
+    ui_drawer.draw_game_extra_score(32, 64 * 5, player.get_score_multiplier(), player.get_score_bonus(), player.get_score_per_gem());
 }
 
 fn draw_player_map(player: *Player) void {
