@@ -1,6 +1,8 @@
 const std = @import("std");
 const rl = @import("raylib");
 
+const Score = @import("score.zig");
+
 const TextureLoader = @import("texture_loader.zig").TextureLoader;
 const SoundLoader = @import("audio.zig").SoundLoader;
 const MusicLoader = @import("audio.zig").MusicLoader;
@@ -96,7 +98,7 @@ pub const Map = struct {
             self.announcement_sound_queue.add(self.sound_loader.get(.say_hurry_up)) catch unreachable;
         }
 
-        const next_level = self.get_current_level(player);
+        const next_level = Score.get_current_level();
         if (next_level != self.level) {
             self.announcement_sound_queue.add(self.sound_loader.get(.say_level)) catch unreachable;
             const sound_id: SoundID = switch (next_level) {
@@ -402,36 +404,6 @@ pub const Map = struct {
             .medium => (-1.0 / 10.0) * @as(f32, @floatFromInt(level)) + 1.25,
             .hard => (-1.0 / 9.0) * @as(f32, @floatFromInt(level)) + 1.25,
             // .hard => 0.1,
-        };
-    }
-
-    pub fn get_current_level(_: @This(), player: *Player) i32 {
-        return switch (player.score) {
-            0...99 => 1,
-            100...299 => 2,
-            300...599 => 3,
-            600...1399 => 4,
-            1400...2999 => 5,
-            3000...6199 => 6,
-            6200...12599 => 7,
-            12600...25399 => 8,
-            25400...50999 => 9,
-            else => 10,
-        };
-    }
-
-    pub fn get_score_to_levelup(self: @This(), player: *Player) i32 {
-        return switch (self.get_current_level(player)) {
-            1 => 100,
-            2 => 300,
-            3 => 600,
-            4 => 1400,
-            5 => 3000,
-            6 => 6200,
-            7 => 12600,
-            8 => 25400,
-            9 => 51000,
-            else => 100000,
         };
     }
 

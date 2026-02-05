@@ -46,7 +46,6 @@ pub const Player = struct {
     animation: Animation,
     action: Action,
 
-    score: i32,
     goals: i32,
     player_texture: *rl.Texture,
     texture_index_count: i32,
@@ -72,13 +71,7 @@ pub const Player = struct {
 
     sound_loader: *SoundLoader,
 
-    pickup_speed_multiplier: i32 = 1,
-    pickup_speed_multiplier_timer: f32 = 0.0,
-    pickup_speed_multiplier_timer_reset: f32 = 1.0,
-
-    map_level: *i32,
-
-    pub fn init(texture_loader: *TextureLoader, sound_loader: *SoundLoader, map_level: *i32) !@This() {
+    pub fn init(texture_loader: *TextureLoader, sound_loader: *SoundLoader) !@This() {
         return .{
             .x = 16,
             .y = 16,
@@ -89,7 +82,6 @@ pub const Player = struct {
             .state = .player_control,
             .animation = .EaseInBack,
             .action = .score,
-            .score = 0,
             .goals = 0,
             .player_texture = texture_loader.get(.player),
             .texture_index_count = 2,
@@ -114,8 +106,6 @@ pub const Player = struct {
             .blue_laser_texture = texture_loader.get(.laser_blue),
 
             .sound_loader = sound_loader,
-
-            .map_level = map_level,
         };
     }
 
@@ -127,10 +117,7 @@ pub const Player = struct {
         self.power_laser = 0;
         self.power_large_laser = 0;
         self.power_giant_laser = 0;
-        self.score = 0;
         self.goals = 0;
-        self.pickup_speed_multiplier = 1;
-        self.pickup_speed_multiplier_timer = 0.0;
     }
 
     pub fn process(self: *@This(), map: *Map, delta: f32) void {
@@ -151,22 +138,6 @@ pub const Player = struct {
             .large_laser => large_laser_state(self, delta),
             .end_large_laser => end_large_laser_state(self, map, delta),
         }
-    }
-
-    pub fn get_score_bonus(self: @This()) i32 {
-        return @divFloor(self.score, 1000);
-    }
-
-    pub fn get_score_multiplier(self: @This()) i32 {
-        return self.pickup_speed_multiplier;
-    }
-
-    pub fn get_score_per_gem(self: @This()) i32 {
-        return std.math.pow(i32, self.map_level.*, 2);
-    }
-
-    pub fn calculate_score(self: @This(), gems: i32) i32 {
-        return (gems * self.get_score_per_gem() * self.get_score_multiplier()) + self.get_score_bonus();
     }
 
     pub fn draw(self: @This()) void {
@@ -264,22 +235,19 @@ pub const Player = struct {
             self.sound_loader.play(.swap);
         } else if (self.action == .score) {
             const gems = map.remove_enemies_between(self.x, self.y, self.px, self.py);
-            self.score = self.score + self.calculate_score(gems);
+            Score.score = Score.score + Score.calculate_score(gems);
             self.sound_loader.play(.score);
-            self.pickup_speed_multiplier_timer = self.pickup_speed_multiplier_timer_reset;
-            self.pickup_speed_multiplier = @min(self.pickup_speed_multiplier + 1, 5);
+            Score.increase_pickup_speed_multiplier();
         } else if (self.action == .goal) {
             _ = map.remove_enemies_between(self.x, self.y, self.px, self.py);
             self.goals = self.goals + 1;
             self.sound_loader.play(.score);
-            self.pickup_speed_multiplier_timer = self.pickup_speed_multiplier_timer_reset;
-            self.pickup_speed_multiplier = @min(self.pickup_speed_multiplier + 1, 5);
+            Score.increase_pickup_speed_multiplier();
         } else if (self.action == .power_laser) {
             _ = map.remove_enemies_between(self.x, self.y, self.px, self.py);
             self.power_laser = self.power_laser + 1;
             self.sound_loader.play(.powerup);
-            self.pickup_speed_multiplier_timer = self.pickup_speed_multiplier_timer_reset;
-            self.pickup_speed_multiplier = @min(self.pickup_speed_multiplier + 1, 5);
+            Score.increase_pickup_speed_multiplier();
             if (self.power_laser >= 3) {
                 self.sound_loader.play(.say_power_up);
             }
@@ -287,8 +255,7 @@ pub const Player = struct {
             _ = map.remove_enemies_between(self.x, self.y, self.px, self.py);
             self.power_large_laser = self.power_large_laser + 1;
             self.sound_loader.play(.powerup);
-            self.pickup_speed_multiplier_timer = self.pickup_speed_multiplier_timer_reset;
-            self.pickup_speed_multiplier = @min(self.pickup_speed_multiplier + 1, 5);
+            Score.increase_pickup_speed_multiplier();
             if (self.power_large_laser >= 3) {
                 self.sound_loader.play(.say_power_up);
             }
@@ -328,9 +295,8 @@ pub const Player = struct {
     }
 
     fn end_laser_state(self: *@This(), map: *Map, _: f32) void {
-        const score: i32 = @intCast(map.remove_enemies_between(self.laser_x, self.laser_y, self.laser_px, self.laser_py));
-        const score_bonus: i32 = @divFloor(self.score, 100);
-        self.score = self.score + std.math.pow(i32, score, 3) + score_bonus;
+        const gems = map.remove_enemies_between(self.laser_x, self.laser_y, self.laser_px, self.laser_py);
+        Score.add_gem_score(gems);
         self.state = .player_control;
         self.sound_loader.play(.score);
     }
@@ -359,15 +325,13 @@ pub const Player = struct {
     }
 
     fn end_large_laser_state(self: *@This(), map: *Map, _: f32) void {
-        var score: i32 = undefined;
-        switch (self.laser_direction) {
-            .left => score = @intCast(map.remove_enemies_between(0, 0, 13, 31)),
-            .right => score = @intCast(map.remove_enemies_between(18, 0, 31, 31)),
-            .up => score = @intCast(map.remove_enemies_between(0, 0, 31, 13)),
-            .down => score = @intCast(map.remove_enemies_between(0, 18, 31, 31)),
-        }
-        const score_bonus: i32 = @divFloor(self.score, 100);
-        self.score = self.score + std.math.pow(i32, score, 3) + score_bonus;
+        const gems: i32 = switch (self.laser_direction) {
+            .left => @intCast(map.remove_enemies_between(0, 0, 13, 31)),
+            .right => @intCast(map.remove_enemies_between(18, 0, 31, 31)),
+            .up => @intCast(map.remove_enemies_between(0, 0, 31, 13)),
+            .down => @intCast(map.remove_enemies_between(0, 18, 31, 31)),
+        };
+        Score.add_gem_score(gems);
         self.state = .player_control;
         self.sound_loader.play(.score);
     }
@@ -426,11 +390,7 @@ pub const Player = struct {
     fn player_control_state(self: *@This(), map: *Map, delta: f32) void {
         self.e = self.e + delta * 1.5;
         self.animation = .EaseOutElastic;
-        self.pickup_speed_multiplier_timer = @max(self.pickup_speed_multiplier_timer - delta, 0.0);
-        if (self.pickup_speed_multiplier_timer <= 0) {
-            self.pickup_speed_multiplier = @max(self.pickup_speed_multiplier - 1, 1);
-            self.pickup_speed_multiplier_timer = self.pickup_speed_multiplier_timer_reset;
-        }
+        Score.process_pickup_speed_muliplier_timer(delta);
 
         if (rl.isKeyPressed(.right)) {
             self.move(.right);

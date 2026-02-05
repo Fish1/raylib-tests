@@ -4,6 +4,8 @@ const ease = @import("ease.zig");
 const Player = @import("player.zig").Player;
 const Map = @import("map.zig").Map;
 
+const Score = @import("score.zig");
+
 const TextureID = @import("texture_loader.zig").TextureID;
 const TextureLoader = @import("texture_loader.zig").TextureLoader;
 const FontLoader = @import("font_loader.zig").FontLoader;
@@ -32,7 +34,6 @@ const GameOverType = enum {
 };
 
 var game_over_type: GameOverType = undefined;
-var game_over_score: i32 = undefined;
 
 var noise_state_previous: TextureID = .noise11;
 var noise_state: TextureID = .noise08;
@@ -81,7 +82,7 @@ pub fn main() !void {
     music_loader.play(.full_song, 0.0, 1.0);
 
     var map: Map = try Map.init(&texture_loader, &sound_loader, &music_loader);
-    var player: Player = try Player.init(&texture_loader, &sound_loader, &map.level);
+    var player: Player = try Player.init(&texture_loader, &sound_loader);
 
     while (rl.windowShouldClose() == false) {
         music_loader.process(rl.getFrameTime());
@@ -133,7 +134,7 @@ fn game_over_state(font_loader: *FontLoader, player: *Player, map: *Map, state: 
     defer rl.endDrawing();
 
     var buffer: [32]u8 = undefined;
-    const score_text = std.fmt.bufPrintZ(&buffer, "You scored {d}!", .{game_over_score}) catch unreachable;
+    const score_text = std.fmt.bufPrintZ(&buffer, "You scored {d}!", .{Score.score}) catch unreachable;
 
     rl.clearBackground(.black);
 
@@ -161,13 +162,11 @@ fn game_state(ui_drawer: UIDrawer, sound_loader: *SoundLoader, music_loader: *Mu
         sound_loader.play(.game_over);
         sound_loader.play(.say_you_lose);
         music_loader.play(.game_over, 3.0, 15.0);
-        game_over_score = player.score;
         game_over_type = .lose;
         state.* = .game_over;
     } else if (player.goals == 3) {
         sound_loader.play(.say_objective_achieved);
         music_loader.play(.game_over, 3.0, 15.0);
-        game_over_score = player.score;
         game_over_type = .win;
         state.* = .game_over;
     }
@@ -202,9 +201,9 @@ fn game_state_draw(ui_drawer: UIDrawer, _: *FontLoader, texture_loader: *Texture
     rl.endMode2D();
 
     ui_drawer.draw_game_goals(64 * 10, 32, player.goals);
-    ui_drawer.draw_game_levelup(32, 32, map.level, player.score, map.get_score_to_levelup(player));
+    ui_drawer.draw_game_levelup(32, 32, map.level, Score.score, Score.get_score_to_levelup());
     ui_drawer.draw_game_powerups(64 * 10, 64 * 5, player.power_laser, player.power_large_laser);
-    ui_drawer.draw_game_extra_score(32, 64 * 5, player.get_score_multiplier(), player.get_score_bonus(), player.get_score_per_gem());
+    ui_drawer.draw_game_extra_score(32, 64 * 5, Score.get_score_multiplier(), Score.get_score_bonus(), Score.get_score_per_gem());
 }
 
 fn draw_player_map(player: *Player, texture_loader: *TextureLoader) void {

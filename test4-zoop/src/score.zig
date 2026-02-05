@@ -35,18 +35,35 @@ pub fn get_score_to_levelup() i32 {
     };
 }
 
-fn get_score_bonus() i32 {
+pub fn increase_pickup_speed_multiplier() void {
+    pickup_speed_multiplier_timer = pickup_speed_multiplier_timer_reset;
+    pickup_speed_multiplier = @min(pickup_speed_multiplier + 1, 5);
+}
+
+pub fn process_pickup_speed_muliplier_timer(delta: f32) void {
+    pickup_speed_multiplier_timer = @max(pickup_speed_multiplier_timer - delta, 0.0);
+    if (pickup_speed_multiplier_timer <= 0) {
+        pickup_speed_multiplier = @max(pickup_speed_multiplier - 1, 1);
+        pickup_speed_multiplier_timer = pickup_speed_multiplier_timer_reset;
+    }
+}
+
+pub fn get_score_bonus() i32 {
     return @divFloor(score, 1000);
 }
 
-fn get_score_multiplier() i32 {
+pub fn get_score_multiplier() i32 {
     return pickup_speed_multiplier;
 }
 
-fn get_score_per_gem() i32 {
+pub fn get_score_per_gem() i32 {
     return std.math.pow(i32, get_current_level(), 2);
 }
 
 pub fn calculate_score(gems: i32) i32 {
     return (gems * get_score_per_gem() * get_score_multiplier()) + get_score_bonus();
+}
+
+pub fn add_gem_score(gems: i32) void {
+    score = score + calculate_score(gems);
 }
