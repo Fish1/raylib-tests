@@ -1,10 +1,5 @@
 const std = @import("std");
 
-// pub var score: i32 = 0;
-// pub var pickup_speed_multiplier: i32 = 1;
-// pub var pickup_speed_multiplier_timer: f32 = 0.0;
-// pub var pickup_speed_multiplier_timer_reset: f32 = 1.0;
-
 pub const Scorer = struct {
     score: i32 = 0,
     pickup_speed_multiplier: i32 = 1,
