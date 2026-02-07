@@ -1,10 +1,11 @@
 const std = @import("std");
 const rl = @import("raylib");
 const ease = @import("ease.zig");
+
 const Player = @import("player.zig").Player;
 const Map = @import("map.zig").Map;
-
-const Score = @import("score.zig");
+const Spawner = @import("spawner.zig").Spawner;
+const Scorer = @import("scorer.zig").Scorer;
 
 const TextureID = @import("texture_loader.zig").TextureID;
 const TextureLoader = @import("texture_loader.zig").TextureLoader;
@@ -81,15 +82,17 @@ pub fn main() !void {
 
     music_loader.play(.full_song, 0.0, 1.0);
 
-    var map: Map = try Map.init(&texture_loader, &sound_loader, &music_loader);
-    var player: Player = try Player.init(&texture_loader, &sound_loader);
+    var scorer: Scorer = Scorer.init();
+    var map: Map = try Map.init(&texture_loader, &sound_loader, &music_loader, &scorer);
+    var player: Player = try Player.init(&texture_loader, &sound_loader, &scorer);
+    var spawner: Spawner = Spawner.init(&map, &player, &difficulty, &scorer);
 
     while (rl.windowShouldClose() == false) {
         music_loader.process(rl.getFrameTime());
         switch (state) {
             .main_menu => main_menu_state(ui_drawer, &ui_sound_queue, &sound_loader, &state, &map, &difficulty),
-            .game => game_state(ui_drawer, &sound_loader, &music_loader, &texture_loader, &font_loader, &player, &map, &state),
-            .game_over => game_over_state(&font_loader, &player, &map, &state),
+            .game => game_state(ui_drawer, &sound_loader, &music_loader, &texture_loader, &font_loader, &player, &map, &spawner, &state, &scorer),
+            .game_over => game_over_state(&font_loader, &player, &map, &state, &scorer),
         }
     }
 }
@@ -129,12 +132,12 @@ fn main_menu_state(ui_drawer: UIDrawer, ui_sound_queue: *SoundQueue, sound_loade
     ui_sound_queue.process();
 }
 
-fn game_over_state(font_loader: *FontLoader, player: *Player, map: *Map, state: *State) void {
+fn game_over_state(font_loader: *FontLoader, player: *Player, map: *Map, state: *State, scorer: *Scorer) void {
     rl.beginDrawing();
     defer rl.endDrawing();
 
     var buffer: [32]u8 = undefined;
-    const score_text = std.fmt.bufPrintZ(&buffer, "You scored {d}!", .{Score.score}) catch unreachable;
+    const score_text = std.fmt.bufPrintZ(&buffer, "You scored {d}!", .{scorer.score}) catch unreachable;
 
     rl.clearBackground(.black);
 
@@ -150,14 +153,15 @@ fn game_over_state(font_loader: *FontLoader, player: *Player, map: *Map, state: 
     if (rl.isKeyPressed(.space)) {
         map.reset();
         player.reset();
+        scorer.reset();
         state.* = .game;
     }
 }
 
-fn game_state(ui_drawer: UIDrawer, sound_loader: *SoundLoader, music_loader: *MusicLoader, texture_loader: *TextureLoader, font_loader: *FontLoader, player: *Player, map: *Map, state: *State) void {
+fn game_state(ui_drawer: UIDrawer, sound_loader: *SoundLoader, music_loader: *MusicLoader, texture_loader: *TextureLoader, font_loader: *FontLoader, player: *Player, map: *Map, spawner: *Spawner, state: *State, scorer: *Scorer) void {
     const delta = rl.getFrameTime();
-    game_state_process(player, map, delta);
-    game_state_draw(ui_drawer, font_loader, texture_loader, player, map);
+    game_state_process(player, map, spawner, delta);
+    game_state_draw(ui_drawer, font_loader, texture_loader, player, map, scorer);
     if (map.is_game_over()) {
         sound_loader.play(.game_over);
         sound_loader.play(.say_you_lose);
@@ -172,8 +176,9 @@ fn game_state(ui_drawer: UIDrawer, sound_loader: *SoundLoader, music_loader: *Mu
     }
 }
 
-fn game_state_process(player: *Player, map: *Map, delta: f32) void {
-    map.process(player, delta);
+fn game_state_process(player: *Player, map: *Map, spawner: *Spawner, delta: f32) void {
+    spawner.process(delta);
+    map.process(delta);
     player.process(map, delta);
     noise_time = noise_time + delta;
     if (noise_time >= noise_speed) {
@@ -189,7 +194,7 @@ fn game_state_process(player: *Player, map: *Map, delta: f32) void {
     }
 }
 
-fn game_state_draw(ui_drawer: UIDrawer, _: *FontLoader, texture_loader: *TextureLoader, player: *Player, map: *Map) void {
+fn game_state_draw(ui_drawer: UIDrawer, _: *FontLoader, texture_loader: *TextureLoader, player: *Player, map: *Map, scorer: *Scorer) void {
     rl.beginDrawing();
     defer rl.endDrawing();
 
@@ -201,9 +206,9 @@ fn game_state_draw(ui_drawer: UIDrawer, _: *FontLoader, texture_loader: *Texture
     rl.endMode2D();
 
     ui_drawer.draw_game_goals(64 * 10, 32, player.goals);
-    ui_drawer.draw_game_levelup(32, 32, map.level, Score.score, Score.get_score_to_levelup());
+    ui_drawer.draw_game_levelup(32, 32, map.level, scorer.score, scorer.get_score_to_levelup());
     ui_drawer.draw_game_powerups(64 * 10, 64 * 5, player.power_laser, player.power_large_laser);
-    ui_drawer.draw_game_extra_score(32, 64 * 5, Score.get_score_multiplier(), Score.get_score_bonus(), Score.get_score_per_gem());
+    ui_drawer.draw_game_extra_score(32, 64 * 5, scorer.get_score_multiplier(), scorer.get_score_bonus(), scorer.get_score_per_gem());
 }
 
 fn draw_player_map(player: *Player, texture_loader: *TextureLoader) void {

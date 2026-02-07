@@ -2,7 +2,7 @@ const rl = @import("raylib");
 const std = @import("std");
 const ease = @import("ease.zig");
 
-const Score = @import("score.zig");
+const Scorer = @import("scorer.zig").Scorer;
 
 const TextureLoader = @import("texture_loader.zig").TextureLoader;
 const SoundLoader = @import("audio.zig").SoundLoader;
@@ -71,7 +71,9 @@ pub const Player = struct {
 
     sound_loader: *SoundLoader,
 
-    pub fn init(texture_loader: *TextureLoader, sound_loader: *SoundLoader) !@This() {
+    scorer: *Scorer,
+
+    pub fn init(texture_loader: *TextureLoader, sound_loader: *SoundLoader, scorer: *Scorer) !@This() {
         return .{
             .x = 16,
             .y = 16,
@@ -106,6 +108,7 @@ pub const Player = struct {
             .blue_laser_texture = texture_loader.get(.laser_blue),
 
             .sound_loader = sound_loader,
+            .scorer = scorer,
         };
     }
 
@@ -235,19 +238,19 @@ pub const Player = struct {
             self.sound_loader.play(.swap);
         } else if (self.action == .score) {
             const gems = map.remove_enemies_between(self.x, self.y, self.px, self.py);
-            Score.score = Score.score + Score.calculate_score(gems);
+            self.scorer.score = self.scorer.score + self.scorer.calculate_score(gems);
             self.sound_loader.play(.score);
-            Score.increase_pickup_speed_multiplier();
+            self.scorer.increase_pickup_speed_multiplier();
         } else if (self.action == .goal) {
             _ = map.remove_enemies_between(self.x, self.y, self.px, self.py);
             self.goals = self.goals + 1;
             self.sound_loader.play(.score);
-            Score.increase_pickup_speed_multiplier();
+            self.scorer.increase_pickup_speed_multiplier();
         } else if (self.action == .power_laser) {
             _ = map.remove_enemies_between(self.x, self.y, self.px, self.py);
             self.power_laser = self.power_laser + 1;
             self.sound_loader.play(.powerup);
-            Score.increase_pickup_speed_multiplier();
+            self.scorer.increase_pickup_speed_multiplier();
             if (self.power_laser >= 3) {
                 self.sound_loader.play(.say_power_up);
             }
@@ -255,7 +258,7 @@ pub const Player = struct {
             _ = map.remove_enemies_between(self.x, self.y, self.px, self.py);
             self.power_large_laser = self.power_large_laser + 1;
             self.sound_loader.play(.powerup);
-            Score.increase_pickup_speed_multiplier();
+            self.scorer.increase_pickup_speed_multiplier();
             if (self.power_large_laser >= 3) {
                 self.sound_loader.play(.say_power_up);
             }
@@ -296,7 +299,7 @@ pub const Player = struct {
 
     fn end_laser_state(self: *@This(), map: *Map, _: f32) void {
         const gems = map.remove_enemies_between(self.laser_x, self.laser_y, self.laser_px, self.laser_py);
-        Score.add_gem_score(gems);
+        self.scorer.add_gem_score(gems);
         self.state = .player_control;
         self.sound_loader.play(.score);
     }
@@ -331,7 +334,7 @@ pub const Player = struct {
             .up => @intCast(map.remove_enemies_between(0, 0, 31, 13)),
             .down => @intCast(map.remove_enemies_between(0, 18, 31, 31)),
         };
-        Score.add_gem_score(gems);
+        self.scorer.add_gem_score(gems);
         self.state = .player_control;
         self.sound_loader.play(.score);
     }
@@ -390,7 +393,7 @@ pub const Player = struct {
     fn player_control_state(self: *@This(), map: *Map, delta: f32) void {
         self.e = self.e + delta * 1.5;
         self.animation = .EaseOutElastic;
-        Score.process_pickup_speed_muliplier_timer(delta);
+        self.scorer.process_pickup_speed_muliplier_timer(delta);
 
         if (rl.isKeyPressed(.right)) {
             self.move(.right);

@@ -1,7 +1,7 @@
 const std = @import("std");
 const rl = @import("raylib");
 
-const Score = @import("score.zig");
+const Scorer = @import("scorer.zig").Scorer;
 
 const TextureLoader = @import("texture_loader.zig").TextureLoader;
 const SoundLoader = @import("audio.zig").SoundLoader;
@@ -33,9 +33,6 @@ pub const Map = struct {
 
     time_total: f32 = 0.0,
 
-    spawn_time: f32 = 0.01,
-    time: f32 = 0.0,
-
     level: i32 = 0,
     level_announcement_state: LevelAnnouncement = .number,
 
@@ -48,19 +45,20 @@ pub const Map = struct {
 
     difficulty: Difficulty = .medium,
 
-    pub fn init(texture_loader: *TextureLoader, sound_loader: *SoundLoader, music_loader: *MusicLoader) !@This() {
+    scorer: *Scorer,
+
+    pub fn init(texture_loader: *TextureLoader, sound_loader: *SoundLoader, music_loader: *MusicLoader, scorer: *Scorer) !@This() {
         return .{
             .enemies = std.mem.zeroes([14 * 4 * 4]?Enemy),
             .enemy_prototype = .init(0, 0, 0, 0, .red, .star, .laser, false, texture_loader),
             .sound_loader = sound_loader,
             .music_loader = music_loader,
+            .scorer = scorer,
         };
     }
 
     pub fn reset(self: *@This()) void {
         self.time_total = 0.0;
-        self.spawn_time = 0.01;
-        self.time = 0.0;
         self.enemies = std.mem.zeroes([14 * 4 * 4]?Enemy);
         self.level_announcement_state = .number;
         self.level = 0;
@@ -71,21 +69,9 @@ pub const Map = struct {
         self.difficulty = difficulty;
     }
 
-    pub fn process(self: *@This(), player: *Player, delta: f32) void {
+    pub fn process(self: *@This(), delta: f32) void {
         self.time_total = self.time_total + delta;
-        // self.spawn_time = (1 / (1 + (self.time_total / 300)));
-        self.spawn_time = self.get_spawn_time();
         self.say_hurry_up_timeout = @max(0.0, self.say_hurry_up_timeout - delta);
-        // self.spawn_time = 1.0 / @as(f32, @floatFromInt(self.level));
-
-        self.time = self.time + delta;
-        if (self.time >= self.spawn_time and player.state == .player_control) {
-            self.time = 0.0;
-            const wall: Direction = @enumFromInt(rl.getRandomValue(0, 3));
-            const wall_part: i32 = rl.getRandomValue(0, 3);
-
-            self.spawn(wall, wall_part);
-        }
 
         for (0..self.enemies.len) |index| {
             if (self.enemies[index]) |*enemy| {
@@ -98,7 +84,7 @@ pub const Map = struct {
             self.announcement_sound_queue.add(self.sound_loader.get(.say_hurry_up)) catch unreachable;
         }
 
-        const next_level = Score.get_current_level();
+        const next_level = self.scorer.get_current_level();
         if (next_level != self.level) {
             self.announcement_sound_queue.add(self.sound_loader.get(.say_level)) catch unreachable;
             const sound_id: SoundID = switch (next_level) {
@@ -127,11 +113,6 @@ pub const Map = struct {
         self.announcement_sound_queue.process();
     }
 
-    pub fn score_required_to_level_up(self: @This()) i32 {
-        const result = @floor(300 * std.math.pow(f32, 1.8, @floatFromInt(self.level)));
-        return @intFromFloat(result);
-    }
-
     pub fn add_enemy(self: *@This(), enemy: Enemy) void {
         for (0..self.enemies.len) |index| {
             const _enemy = self.enemies[index];
@@ -139,77 +120,6 @@ pub const Map = struct {
                 self.enemies[index] = enemy;
                 return;
             }
-        }
-    }
-
-    pub fn spawn_at_location(self: *@This(), x: i32, y: i32, px: i32, py: i32) void {
-        var new_enemy = self.enemy_prototype.copy_to(x, y, px, py);
-        const gem_type = rl.getRandomValue(0, 99);
-        if (gem_type >= 0 and gem_type <= 4 and self.level == 10) {
-            new_enemy.set_goal(true);
-        } else if (gem_type >= 89 and gem_type <= 99) {
-            var power: ?GemPower = null;
-            if (self.level <= 8) {
-                power = .laser;
-            } else {
-                power = .large_laser;
-            }
-            new_enemy.set_power(power);
-        }
-        new_enemy.update_texture();
-        self.add_enemy(new_enemy);
-    }
-
-    pub fn spawn(self: *@This(), direction: Direction, wall_part: i32) void {
-        if (wall_part < 0 or wall_part >= 4) {
-            return;
-        }
-
-        if (direction == .left) {
-            const y = 14 + wall_part;
-            for (&self.enemies) |*_check_enemy| {
-                if (_check_enemy.*) |*check_enemy| {
-                    if (check_enemy.y != y or check_enemy.x > 14) {
-                        continue;
-                    }
-                    check_enemy.move(.right);
-                }
-            }
-            self.spawn_at_location(0, y, -1, y);
-        } else if (direction == .up) {
-            const x = 14 + wall_part;
-            for (&self.enemies) |*_check_enemy| {
-                if (_check_enemy.*) |*check_enemy| {
-                    if (check_enemy.x != x or check_enemy.y > 14) {
-                        continue;
-                    }
-                    check_enemy.move(.down);
-                }
-            }
-
-            self.spawn_at_location(x, 0, x, -1);
-        } else if (direction == .right) {
-            const y = 14 + wall_part;
-            for (&self.enemies) |*_check_enemy| {
-                if (_check_enemy.*) |*check_enemy| {
-                    if (check_enemy.y != y or check_enemy.x < 14) {
-                        continue;
-                    }
-                    check_enemy.move(.left);
-                }
-            }
-            self.spawn_at_location(31, y, 32, y);
-        } else if (direction == .down) {
-            const x = 14 + wall_part;
-            for (&self.enemies) |*_check_enemy| {
-                if (_check_enemy.*) |*check_enemy| {
-                    if (check_enemy.x != x or check_enemy.y < 14) {
-                        continue;
-                    }
-                    check_enemy.move(.up);
-                }
-            }
-            self.spawn_at_location(x, 31, x, 32);
         }
     }
 
@@ -361,50 +271,6 @@ pub const Map = struct {
             const enemy = _enemy orelse continue;
             enemy.draw();
         }
-    }
-
-    pub fn get_x_left(self: @This(), y: i32) i32 {
-        const start: usize = @intCast(y * width);
-        const end: usize = @intCast((y + 1) * width);
-        for (start..end) |index| {
-            const _enemy = self.enemies_left[index];
-            if (_enemy) |_| {} else {
-                const x: i32 = @intCast(@mod(index, width));
-                return x;
-            }
-        }
-        return width;
-    }
-
-    pub fn get_x_right(self: @This(), y: i32) i32 {
-        const start: usize = @intCast(y * width);
-        const end: usize = @intCast((y + 1) * width);
-        var index: usize = end - 1;
-        while (index >= start) : (index = index - 1) {
-            const _enemy = self.enemies_right[index];
-            if (_enemy) |_| {} else {
-                return @intCast(@mod(index, width) + 18);
-            }
-        }
-        return width + 18;
-    }
-
-    pub fn get_y_up(x: i32) i32 {
-        return x + 1;
-    }
-
-    pub fn get_y_down(x: i32) i32 {
-        return x + 1;
-    }
-
-    pub fn get_spawn_time(self: @This()) f32 {
-        const level = self.level;
-        return switch (self.difficulty) {
-            .easy => (-1.0 / 12.0) * @as(f32, @floatFromInt(level)) + 1.25,
-            .medium => (-1.0 / 10.0) * @as(f32, @floatFromInt(level)) + 1.25,
-            .hard => (-1.0 / 9.0) * @as(f32, @floatFromInt(level)) + 1.25,
-            // .hard => 0.1,
-        };
     }
 
     pub fn is_game_over(self: *@This()) bool {
