@@ -93,7 +93,7 @@ pub fn main() !void {
     while (rl.windowShouldClose() == false) {
         music_loader.process(rl.getFrameTime());
         switch (state) {
-            .main_menu => main_menu_state(ui_drawer, &ui_sound_queue, &sound_loader, &state, &map, &difficulty),
+            .main_menu => main_menu_state(ui_drawer, &ui_sound_queue, &sound_loader, &state, &map, &difficulty, &input),
             .game => game_state(ui_drawer, &sound_loader, &music_loader, &texture_loader, &font_loader, &player, &map, &spawner, &state, &scorer),
             .game_over => game_over_state(&font_loader, &player, &map, &state, &scorer),
         }
@@ -110,7 +110,7 @@ fn main_menu_state(ui_drawer: UIDrawer, ui_sound_queue: *SoundQueue, sound_loade
     ui_drawer.draw_main_menu_title((window_width / 2) - (475 / 2), (window_height / 2) - (475 / 2));
     ui_drawer.draw_main_menu_difficulty_select((window_width / 2) - (475 / 2), 530, difficulty.*);
 
-    if (rl.isKeyPressed(.left)) {
+    if (input.is_action_pressed(.ui_left)) {
         ui_sound_queue.clear();
         ui_sound_queue.add(sound_loader.get(.ui_switch_a)) catch unreachable;
         ui_sound_queue.add(sound_loader.get(.ui_switch_b)) catch unreachable;
@@ -120,7 +120,7 @@ fn main_menu_state(ui_drawer: UIDrawer, ui_sound_queue: *SoundQueue, sound_loade
             .hard => .medium,
         };
         map.set_difficulty(difficulty.*);
-    } else if (rl.isKeyPressed(.right)) {
+    } else if (input.is_action_pressed(.ui_right)) {
         ui_sound_queue.clear();
         ui_sound_queue.add(sound_loader.get(.ui_switch_a)) catch unreachable;
         ui_sound_queue.add(sound_loader.get(.ui_switch_b)) catch unreachable;
